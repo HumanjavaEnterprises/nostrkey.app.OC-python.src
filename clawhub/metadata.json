@@ -8,6 +8,7 @@
     "url": "https://loginwithnostr.com/openclaw"
   },
   "license": "MIT",
+  "acceptLicenseTerms": true,
   "repository": "https://github.com/HumanjavaEnterprises/nostrkey.app.OC-python.src",
   "tags": [
     "nostr",
