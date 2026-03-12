@@ -2,7 +2,19 @@
 
 **Give your AI its own cryptographic identity.**
 
-A Python SDK for OpenClaw AI entities to generate Nostr keypairs, sign events, encrypt data, and manage their own sovereign identity on the Nostr protocol.
+A Python SDK for OpenClaw AI entities to generate Nostr keypairs, sign events, encrypt data, and manage their own identity on the Nostr protocol.
+
+## Why?
+
+AI agents need identity. Not a shared API key — their *own* keypair, their own signature, their own verifiable presence on an open protocol. That's what this SDK gives them.
+
+**A few things your bot can do with its own npub:**
+
+- **Sign its own work** — every post, response, or action is cryptographically signed. Anyone can verify it came from your bot, not an impersonator.
+- **Send and receive encrypted messages** — private communication between your bot and its human, or between bots, using NIP-44 encryption. No platform middleman.
+- **Persist memory across sessions** — save encrypted identity files and reload them. Your bot picks up where it left off.
+- **Publish to the Nostr network** — your bot can post notes, respond to mentions, and interact on any Nostr relay. It's a first-class participant, not a wrapper around someone else's account.
+- **Delegate sensitive actions to a human** — via NIP-46 bunker, your bot can request its human sponsor to co-sign high-stakes events. The human stays in the loop without holding the bot's keys.
 
 ## Install
 
