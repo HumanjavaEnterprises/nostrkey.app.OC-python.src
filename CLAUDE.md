@@ -29,7 +29,11 @@ NostrKey (browser extension) is for humans. This SDK is for AI entities (OpenCla
 - kebab-case for file names in docs/config, snake_case for Python modules
 - Tests in `tests/` using pytest
 - Examples in `examples/`
+- ClawHub skill definition in `clawhub/` (SKILL.md + metadata.json)
 - No cryptocurrency/token functionality — identity only
+
+## ClawHub Skill
+The `clawhub/` directory contains the OpenClaw skill bundle for publishing to ClawHub. Keep `metadata.json` version in sync with `pyproject.toml` version on each release. The `SKILL.md` is the agent-facing instruction set — it should reflect the current public API.
 
 ## Related Repos
 - `nostrkey.browser.plugin.src` — NostrKey browser extension (JS, the human equivalent)
