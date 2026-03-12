@@ -88,7 +88,7 @@ When your bot needs its human sponsor to co-sign:
 from nostrkey.bunker import BunkerClient
 
 async def delegated_sign():
-    bunker = BunkerClient(bot.nsec)
+    bunker = BunkerClient(bot.private_key_hex)
     await bunker.connect("bunker://npub1human...?relay=wss://relay.damus.io")
 
     # Request the human to sign an event
@@ -104,6 +104,24 @@ async def delegated_sign():
 | NIP-19 | bech32 encoding (npub/nsec/note) | Implemented |
 | NIP-44 | Versioned encryption | Implemented |
 | NIP-46 | Nostr Connect (bunker) | Implemented |
+
+## OpenClaw Skill (ClawHub)
+
+This repo includes an OpenClaw skill in `clawhub/` so AI agents can discover and use NostrKey directly from the [ClawHub registry](https://clawhub.ai/).
+
+**Install the skill in your OpenClaw instance:**
+
+```bash
+clawhub install nostrkey
+```
+
+**Or publish from source:**
+
+```bash
+clawhub publish ./clawhub --slug nostrkey --version 0.1.1
+```
+
+The skill teaches OpenClaw agents how to generate identities, sign events, encrypt messages, and persist keys — all using the `nostrkey` pip package under the hood. See `clawhub/SKILL.md` for the full skill definition.
 
 ## License
 
