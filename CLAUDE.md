@@ -35,6 +35,10 @@ NostrKey (browser extension) is for humans. This SDK is for AI entities (OpenCla
 ## ClawHub Skill
 The `clawhub/` directory contains the OpenClaw skill bundle for publishing to ClawHub. Keep `metadata.json` version in sync with `pyproject.toml` version on each release. The `SKILL.md` is the agent-facing instruction set — it should reflect the current public API.
 
+**Published:** `nostrkey@0.1.1` on ClawHub (2026-03-12). Install via `clawhub install nostrkey`.
+**Publish command:** `clawhub publish ./clawhub --slug nostrkey --name "NostrKey" --version X.Y.Z --tags latest --changelog "..."`
+**Examples:** `clawhub/examples/` — generate_and_post.py, encrypt_dm.py, delegated_signing.py
+
 ## Related Repos
 - `nostrkey.browser.plugin.src` — NostrKey browser extension (JS, the human equivalent)
 - `nostr-crypto-utils` — TypeScript crypto library (reference implementation for crypto operations)
