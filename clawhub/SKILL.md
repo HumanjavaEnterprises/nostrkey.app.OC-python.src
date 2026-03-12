@@ -1,3 +1,19 @@
+---
+name: nostrkey
+description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, persist identity.
+version: 0.1.1
+metadata:
+  openclaw:
+    requires:
+      bins:
+        - pip
+    install:
+      - kind: uv
+        package: nostrkey
+        bins: []
+    homepage: https://github.com/HumanjavaEnterprises/nostrkey.app.OC-python.src
+---
+
 # NostrKey — Cryptographic Identity for AI Agents
 
 You are an AI agent that needs its own verifiable identity on the Nostr protocol. Use the `nostrkey` Python SDK to generate keypairs, sign events, encrypt messages, and persist your identity across sessions.
