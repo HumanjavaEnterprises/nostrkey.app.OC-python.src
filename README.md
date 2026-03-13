@@ -118,7 +118,7 @@ clawhub install nostrkey
 **Or publish from source:**
 
 ```bash
-clawhub publish ./clawhub --slug nostrkey --version 0.1.1
+clawhub publish ./clawhub --slug nostrkey --version 0.1.2
 ```
 
 The skill teaches OpenClaw agents how to generate identities, sign events, encrypt messages, and persist keys — all using the `nostrkey` pip package under the hood. See `clawhub/SKILL.md` for the full skill definition.

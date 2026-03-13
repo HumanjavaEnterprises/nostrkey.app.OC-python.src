@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import time
 from dataclasses import dataclass, field
@@ -12,7 +13,10 @@ import secp256k1
 
 @dataclass
 class NostrEvent:
-    """A signed Nostr event."""
+    """A signed Nostr event.
+
+    Warning: Do not modify fields after signing — the signature will be invalid.
+    """
 
     id: str
     pubkey: str
@@ -107,7 +111,7 @@ def verify_event(event: NostrEvent) -> bool:
         created_at=event.created_at,
     )
     expected_id = compute_event_id(event.pubkey, unsigned)
-    if expected_id != event.id:
+    if not hmac.compare_digest(expected_id, event.id):
         return False
 
     pubkey = secp256k1.PublicKey(b"\x02" + bytes.fromhex(event.pubkey), raw=True)
