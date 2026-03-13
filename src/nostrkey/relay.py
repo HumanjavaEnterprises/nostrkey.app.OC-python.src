@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from typing import AsyncIterator
+from urllib.parse import urlparse
 
 import websockets
 
@@ -23,11 +25,16 @@ class RelayClient:
     """
 
     def __init__(self, url: str):
+        parsed = urlparse(url)
+        if parsed.scheme not in ("ws", "wss"):
+            raise ValueError(
+                f"Invalid relay URL scheme '{parsed.scheme}': must be ws:// or wss://"
+            )
         self.url = url
         self._ws = None
 
     async def __aenter__(self):
-        self._ws = await websockets.connect(self.url)
+        self._ws = await websockets.connect(self.url, open_timeout=30)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -45,7 +52,7 @@ class RelayClient:
         msg = json.dumps(["EVENT", event.to_dict()])
         await self._ws.send(msg)
 
-        response = await self._ws.recv()
+        response = await asyncio.wait_for(self._ws.recv(), timeout=30)
         data = json.loads(response)
         if data[0] == "OK" and data[2] is True:
             return True
@@ -66,7 +73,7 @@ class RelayClient:
         if not self._ws:
             raise RuntimeError("Not connected — use 'async with RelayClient(url) as relay:'")
 
-        sub_id = subscription_id or str(uuid.uuid4())[:8]
+        sub_id = subscription_id or str(uuid.uuid4())
         msg = json.dumps(["REQ", sub_id, *filters])
         await self._ws.send(msg)
 

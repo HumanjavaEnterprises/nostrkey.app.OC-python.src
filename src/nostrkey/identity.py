@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac as hmac_module
 import json
 import os
 from dataclasses import dataclass
 
 from nostrkey.events import NostrEvent, UnsignedEvent, sign_event
 from nostrkey.keys import (
+    _validate_hex_key,
     generate_keypair,
     hex_to_npub,
     hex_to_nsec,
@@ -49,6 +51,7 @@ class Identity:
     @classmethod
     def from_hex(cls, private_key_hex: str) -> Identity:
         """Create an identity from an existing hex private key."""
+        _validate_hex_key(private_key_hex, "private key")
         pubkey_hex = private_key_to_public_key(private_key_hex)
         return cls(_private_key_hex=private_key_hex, _public_key_hex=pubkey_hex)
 
@@ -96,16 +99,20 @@ class Identity:
             passphrase: Passphrase to encrypt the private key.
         """
         salt = os.urandom(16)
-        key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, 100_000)
+        key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, 600_000)
 
         # XOR encrypt the private key with the derived key
         privkey_bytes = bytes.fromhex(self._private_key_hex)
         encrypted = bytes(a ^ b for a, b in zip(privkey_bytes, key))
 
+        # HMAC-SHA256 over salt + encrypted for authentication
+        mac = hmac_module.new(key, salt + encrypted, hashlib.sha256).digest()
+
         data = {
-            "version": 1,
+            "version": 2,
             "npub": self.npub,
             "salt": base64.b64encode(salt).decode(),
+            "hmac": base64.b64encode(mac).decode(),
             "encrypted_nsec": base64.b64encode(encrypted).decode(),
         }
 
@@ -122,16 +129,29 @@ class Identity:
 
         Returns:
             The decrypted Identity.
+
+        Raises:
+            ValueError: If the passphrase is wrong or the file is corrupted.
         """
         with open(filepath) as f:
             data = json.load(f)
 
-        if data.get("version") != 1:
-            raise ValueError(f"Unsupported identity file version: {data.get('version')}")
+        version = data.get("version")
+        if version not in (1, 2):
+            raise ValueError(f"Unsupported identity file version: {version}")
 
         salt = base64.b64decode(data["salt"])
         encrypted = base64.b64decode(data["encrypted_nsec"])
-        key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, 100_000)
+
+        iterations = 600_000 if version == 2 else 100_000
+        key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, iterations)
+
+        # Verify HMAC if present (version 2)
+        if version == 2:
+            stored_mac = base64.b64decode(data["hmac"])
+            expected_mac = hmac_module.new(key, salt + encrypted, hashlib.sha256).digest()
+            if not hmac_module.compare_digest(stored_mac, expected_mac):
+                raise ValueError("Invalid passphrase or corrupted file")
 
         privkey_bytes = bytes(a ^ b for a, b in zip(encrypted, key))
         return cls.from_hex(privkey_bytes.hex())

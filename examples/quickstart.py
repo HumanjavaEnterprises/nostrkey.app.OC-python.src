@@ -5,7 +5,7 @@ from nostrkey import Identity
 # Generate a new identity for your bot
 bot = Identity.generate()
 print(f"Bot npub: {bot.npub}")
-print(f"Bot nsec: {bot.nsec}")
+# bot.nsec available but never log it
 print()
 
 # Sign a text note (kind 1)

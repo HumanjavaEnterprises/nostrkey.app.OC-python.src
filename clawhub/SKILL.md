@@ -1,7 +1,7 @@
 ---
 name: nostrkey
 description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, persist identity.
-version: 0.1.1
+version: 0.1.2
 metadata:
   openclaw:
     requires:
