@@ -14,14 +14,40 @@ metadata:
     homepage: https://github.com/HumanjavaEnterprises/nostrkey.app.OC-python.src
 ---
 
-# NostrKey — Cryptographic Identity for AI Agents
+# NostrKey -- Cryptographic Identity for AI Agents
 
-You are an AI agent that needs its own verifiable identity on the Nostr protocol. Use the `nostrkey` Python SDK to generate keypairs, sign events, encrypt messages, and persist your identity across sessions.
+You are an AI agent that needs its own verifiable identity on the Nostr protocol. Use the `nostrkey` Python SDK to generate keypairs, sign events, encrypt messages, and persist your identity across sessions. All cryptographic operations use Schnorr signatures over secp256k1 per NIP-01, and NIP-44 encryption uses ECDH + HKDF + ChaCha20 with length padding for private communication.
 
 ## Install
 
 ```bash
 pip install nostrkey
+```
+
+The PyPI package name matches the import name:
+
+```python
+from nostrkey import Identity
+```
+
+## Quickstart
+
+Generate an identity, sign an event, and publish it to a relay:
+
+```python
+from nostrkey import Identity
+from nostrkey.relay import RelayClient
+
+me = Identity.generate()
+
+event = me.sign_event(
+    kind=1,
+    content="Hello from an AI agent",
+    tags=[]
+)
+
+async with RelayClient("wss://relay.damus.io") as relay:
+    await relay.publish(event)
 ```
 
 ## Core Capabilities
@@ -43,7 +69,10 @@ me = Identity.generate()
 If you already have keys:
 
 ```python
-me = Identity.from_nsec("nsec1...")
+import os
+from nostrkey import Identity
+
+me = Identity.from_nsec(os.environ["NOSTR_NSEC"])
 # or
 me = Identity.from_hex("deadbeef...")
 ```
@@ -92,7 +121,7 @@ plaintext = decrypt(
 )
 ```
 
-### Save & Load Identity (Encrypted File)
+### Save and Load Identity (Encrypted File)
 
 Persist your identity between sessions:
 
@@ -116,7 +145,7 @@ await bunker.connect("bunker://npub1human...?relay=wss://relay.damus.io")
 signed = await bunker.sign_event(kind=1, content="Human-approved action")
 ```
 
-## When to Use Each Module
+### Module Reference
 
 | Task | Module | Function |
 |------|--------|----------|
@@ -130,10 +159,99 @@ signed = await bunker.sign_event(kind=1, content="Human-approved action")
 | Save/load identity | `nostrkey` | `identity.save()` / `Identity.load()` |
 | Low-level key ops | `nostrkey.keys` | `generate_keypair()`, `hex_to_npub()`, etc. |
 
-## Important Notes
+## Response Format
+
+### Identity Fields
+
+When you call `Identity.generate()`, `Identity.from_nsec()`, or `Identity.from_hex()`, the returned object has these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `npub` | `str` | Bech32-encoded public key (e.g. `npub1...`). Safe to share. |
+| `nsec` | `str` | Bech32-encoded private key (e.g. `nsec1...`). Never expose. |
+| `private_key_hex` | `str` | 64-char hex private key. Used internally and for bunker clients. |
+| `public_key_hex` | `str` | 64-char hex public key. Used in event `pubkey` fields. |
+
+### Event Fields
+
+When you call `identity.sign_event()`, the returned event object has these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `str` | 64-char hex event hash (SHA-256 of serialized event). |
+| `sig` | `str` | 128-char hex Schnorr signature over `id`. |
+| `kind` | `int` | Event kind (0 = metadata, 1 = text note, etc.). |
+| `content` | `str` | Event payload. |
+| `tags` | `list[list[str]]` | Event tags (e.g. `[["p", "pubkey..."], ["e", "eventid..."]]`). |
+| `pubkey` | `str` | 64-char hex public key of the signer. |
+| `created_at` | `int` | Unix timestamp (seconds). |
+
+## Common Patterns
+
+### Async Relay Usage
+
+Relay and bunker operations require `asyncio`. Use `async with` for relay connections:
+
+```python
+import asyncio
+from nostrkey import Identity
+from nostrkey.relay import RelayClient
+
+async def main():
+    me = Identity.generate()
+    event = me.sign_event(kind=1, content="Hello Nostr", tags=[])
+    async with RelayClient("wss://relay.damus.io") as relay:
+        await relay.publish(event)
+
+asyncio.run(main())
+```
+
+### Error Handling for Bad Keys
+
+```python
+from nostrkey import Identity
+
+try:
+    me = Identity.from_nsec("invalid-key")
+except Exception as e:
+    print(f"Invalid key: {e}")
+```
+
+### Load Identity from Environment
+
+```python
+import os
+from nostrkey import Identity
+
+nsec = os.environ.get("NOSTR_NSEC")
+if nsec:
+    me = Identity.from_nsec(nsec)
+else:
+    me = Identity.generate()
+    print(f"Generated new identity: {me.npub}")
+```
+
+## Security
 
 - **Never expose your nsec.** Treat it like a password. Use `identity.save()` with a strong passphrase to persist it.
-- **Async-first.** Relay and bunker operations require `asyncio`. Use `async with` for relay connections.
+- **`.nostrkey` files are encrypted at rest.** Never store raw nsec values on disk.
+- **Use environment variables, not hardcoded keys.** Load nsec from `NOSTR_NSEC` at runtime, never commit it to source.
 - **All events are Schnorr-signed** using secp256k1, per the Nostr protocol (NIP-01).
-- **NIP-44 encryption** uses ECDH + HKDF + ChaCha20 with length padding — safe for private agent-to-agent or agent-to-human communication.
-- **`.nostrkey` files** are encrypted at rest. Never store raw nsec values on disk.
+- **NIP-44 encryption** uses ECDH + HKDF + ChaCha20 with length padding -- safe for private agent-to-agent or agent-to-human communication.
+
+## Configuration
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `NOSTR_NSEC` | Private key for identity import | `nsec1...` |
+| `NOSTR_RELAY` | Default relay WebSocket URL | `wss://relay.damus.io` |
+
+## Links
+
+- **PyPI:** <https://pypi.org/project/nostrkey/>
+- **GitHub:** <https://github.com/HumanjavaEnterprises/nostrkey.app.OC-python.src>
+- **ClawHub:** `clawhub install nostrkey`
+
+---
+
+License: MIT
