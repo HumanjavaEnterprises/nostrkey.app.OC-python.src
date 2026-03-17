@@ -1,7 +1,7 @@
 ---
 name: nostrkey
-description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, persist identity.
-version: 0.1.3
+description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, persist identity. Red-team audited, 49 tests, zero C dependencies.
+version: 0.2.0
 metadata:
   openclaw:
     requires:
@@ -16,7 +16,7 @@ metadata:
 
 # NostrKey -- Cryptographic Identity for AI Agents
 
-You are an AI agent that needs its own verifiable identity on the Nostr protocol. Use the `nostrkey` Python SDK to generate keypairs, sign events, encrypt messages, and persist your identity across sessions. All cryptographic operations use Schnorr signatures over secp256k1 per NIP-01, and NIP-44 encryption uses ECDH + HKDF + ChaCha20 with length padding for private communication.
+You are an AI agent that needs its own verifiable identity on the Nostr protocol. Use the `nostrkey` Python SDK (v0.2.0) to generate keypairs, sign events, encrypt messages, and persist your identity across sessions. All cryptographic operations use BIP-340 Schnorr signatures over secp256k1, and NIP-44 encryption uses ECDH + HKDF + ChaCha20 with spec-compliant length padding for private communication. Zero C dependencies — `pip install nostrkey` just works on any platform.
 
 ## Install
 
@@ -233,11 +233,16 @@ else:
 
 ## Security
 
+v0.2.0 was red-team audited (15 findings fixed, 49 tests):
+
 - **Never expose your nsec.** Treat it like a password. Use `identity.save()` with a strong passphrase to persist it.
-- **`.nostrkey` files are encrypted at rest.** Never store raw nsec values on disk.
+- **`.nostrkey` files are encrypted at rest** with ChaCha20-Poly1305 AEAD (PBKDF2 600K iterations). Never store raw nsec values on disk.
 - **Use environment variables, not hardcoded keys.** Load nsec from `NOSTR_NSEC` at runtime, never commit it to source.
-- **All events are Schnorr-signed** using secp256k1, per the Nostr protocol (NIP-01).
-- **NIP-44 encryption** uses ECDH + HKDF + ChaCha20 with length padding -- safe for private agent-to-agent or agent-to-human communication.
+- **All events are BIP-340 Schnorr-signed** over secp256k1, per the Nostr protocol (NIP-01).
+- **NIP-44 encryption** uses ECDH + HKDF + ChaCha20 with spec-compliant length padding -- safe for private agent-to-agent or agent-to-human communication.
+- **Relay SSRF protection** blocks connections to localhost, private IPs, and reserved addresses.
+- **Path traversal protection** on identity file save/load.
+- **Zero C dependencies** -- only `cryptography` (binary wheels), `websockets`, `bech32`.
 
 ## Configuration
 
@@ -250,7 +255,9 @@ else:
 
 - **PyPI:** <https://pypi.org/project/nostrkey/>
 - **GitHub:** <https://github.com/HumanjavaEnterprises/nostrkey.app.OC-python.src>
+- **Docs:** <https://nostrkey.com/python>
 - **ClawHub:** `clawhub install nostrkey`
+- **OpenClaw:** <https://loginwithnostr.com/openclaw>
 
 ---
 
