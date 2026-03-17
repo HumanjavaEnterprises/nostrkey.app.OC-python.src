@@ -42,6 +42,7 @@ class BunkerClient:
         self._remote_pubkey: str | None = None
         self._relay_url: str | None = None
         self._ws = None
+        self._sub_id: str = "bunker"
 
     async def connect(self, bunker_url: str) -> None:
         """Connect to a bunker via a bunker:// URL.
@@ -64,9 +65,10 @@ class BunkerClient:
         self._ws = await websockets.connect(self._relay_url, open_timeout=30)
 
         # Subscribe to responses from the remote signer
+        self._sub_id = f"bunker-{uuid.uuid4()}"
         sub_msg = json.dumps([
             "REQ",
-            "bunker",
+            self._sub_id,
             {"kinds": [24133], "authors": [self._remote_pubkey], "#p": [self._pubkey]},
         ])
         await self._ws.send(sub_msg)
@@ -139,8 +141,10 @@ class BunkerClient:
         # Wait for response
         async for raw in self._ws:
             data = json.loads(raw)
-            if data[0] == "EVENT" and data[1] == "bunker":
+            if data[0] == "EVENT" and data[1] == self._sub_id:
                 evt = data[2]
+                if evt["pubkey"] != self._remote_pubkey:
+                    continue
                 try:
                     decrypted = decrypt(self._privkey, evt["pubkey"], evt["content"])
                     response = json.loads(decrypted)

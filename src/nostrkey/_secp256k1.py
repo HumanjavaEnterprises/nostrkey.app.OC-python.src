@@ -218,5 +218,6 @@ def ecdh(private_key_bytes: bytes, public_key_x_bytes: bytes) -> bytes:
     priv_key = priv_numbers.private_key()
 
     shared = priv_key.exchange(ECDH(), pub_key)
-    # Hash the shared point x-coordinate (same as libsecp256k1 ecdh default)
-    return hashlib.sha256(shared).digest()
+    # NIP-44 expects the raw 32-byte x-coordinate, not a hash.
+    # cryptography's ECDH().exchange() already returns the raw x-coordinate bytes.
+    return shared

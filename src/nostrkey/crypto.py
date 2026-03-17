@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import secrets
 import struct
 
@@ -30,24 +31,24 @@ def _hkdf_expand(prk: bytes, info: bytes, length: int) -> bytes:
     return b"".join(blocks)[:length]
 
 
-def _pad_plaintext(plaintext: bytes) -> bytes:
-    """Pad plaintext to a standard length to prevent length-based analysis."""
-    unpadded_len = len(plaintext)
-    if unpadded_len < 32:
-        padded_len = 32
-    elif unpadded_len < 64:
-        padded_len = 64
-    elif unpadded_len < 128:
-        padded_len = 128
-    elif unpadded_len < 256:
-        padded_len = 256
-    else:
-        # Round up to nearest multiple of 256
-        padded_len = ((unpadded_len + 255) // 256) * 256
+def _calc_padded_len(unpadded_len: int) -> int:
+    """Calculate NIP-44 padded length for a given plaintext length."""
+    if unpadded_len <= 0:
+        raise ValueError("Plaintext must not be empty")
+    if unpadded_len <= 32:
+        return 32
+    next_power = 1 << (math.floor(math.log2(unpadded_len - 1)) + 1)
+    chunk = 32 if next_power <= 256 else next_power // 8
+    return chunk * (math.floor((unpadded_len - 1) / chunk) + 1)
 
-    if padded_len > 65535:
+
+def _pad_plaintext(plaintext: bytes) -> bytes:
+    """Pad plaintext using the NIP-44 padding algorithm."""
+    unpadded_len = len(plaintext)
+    if unpadded_len > 65535:
         raise ValueError("Plaintext too long (max 65535 bytes)")
 
+    padded_len = _calc_padded_len(unpadded_len)
     padding = b"\x00" * (padded_len - unpadded_len)
     return struct.pack(">H", unpadded_len) + plaintext + padding
 
@@ -55,10 +56,10 @@ def _pad_plaintext(plaintext: bytes) -> bytes:
 def _unpad_plaintext(padded: bytes) -> bytes:
     """Remove padding from decrypted plaintext."""
     if len(padded) < 2:
-        raise ValueError("Padded data too short")
+        raise ValueError("Decryption failed")
     actual_len = struct.unpack(">H", padded[:2])[0]
     if actual_len > len(padded) - 2:
-        raise ValueError("Invalid padding length")
+        raise ValueError("Decryption failed")
     return padded[2 : 2 + actual_len]
 
 
@@ -73,6 +74,9 @@ def encrypt(sender_nsec: str, recipient_npub: str, plaintext: str) -> str:
     Returns:
         Base64-encoded ciphertext with version prefix.
     """
+    if not plaintext:
+        raise ValueError("Plaintext must not be empty")
+
     import base64
 
     from nostrkey.keys import nsec_to_hex, npub_to_hex
@@ -124,6 +128,9 @@ def decrypt(recipient_nsec: str, sender_npub: str, ciphertext_b64: str) -> str:
     pubkey_hex = npub_to_hex(sender_npub) if sender_npub.startswith("npub") else sender_npub
 
     payload = base64.b64decode(ciphertext_b64)
+
+    if len(payload) < 99:
+        raise ValueError("Ciphertext too short")
 
     version = payload[0]
     if version != 2:
