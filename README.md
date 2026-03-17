@@ -4,6 +4,8 @@
 
 A Python SDK for OpenClaw AI entities to generate Nostr keypairs, sign events, encrypt data, and manage their own identity on the Nostr protocol.
 
+**v0.2.0** — Security hardened. 49 tests. Zero C dependencies. `pip install nostrkey` just works.
+
 ## Why?
 
 AI agents need identity. Not a shared API key — their *own* keypair, their own signature, their own verifiable presence on an open protocol. That's what this SDK gives them.
@@ -21,6 +23,10 @@ AI agents need identity. Not a shared API key — their *own* keypair, their own
 ```bash
 pip install nostrkey
 ```
+
+No C compiler, no system libraries, no Homebrew. The `cryptography` package (the only native dependency) ships pre-built wheels for macOS, Linux, and Windows.
+
+**Python 3.10 – 3.14 supported.**
 
 ## Quick Start
 
@@ -53,7 +59,7 @@ asyncio.run(publish())
 ## Save & Load Identity
 
 ```python
-# Save identity to file (encrypted)
+# Save identity to file (encrypted with ChaCha20-Poly1305 AEAD)
 bot.save("my-bot.nostrkey", passphrase="strong-passphrase")
 
 # Load it back
@@ -95,6 +101,17 @@ async def delegated_sign():
     signed = await bunker.sign_event(kind=1, content="Human-approved message")
 ```
 
+## Modules
+
+| Module | What |
+|--------|------|
+| `nostrkey.identity` | High-level identity management — generate, import, sign, save, load |
+| `nostrkey.keys` | Keypair generation, bech32 encoding (npub/nsec), hex conversion |
+| `nostrkey.events` | Create, serialize, hash, and sign Nostr events (NIP-01) |
+| `nostrkey.crypto` | NIP-44 versioned encryption and decryption |
+| `nostrkey.bunker` | NIP-46 bunker client for delegated signing |
+| `nostrkey.relay` | Async WebSocket relay client — publish events, subscribe to filters |
+
 ## NIPs Implemented
 
 | NIP | What | Status |
@@ -105,23 +122,38 @@ async def delegated_sign():
 | NIP-44 | Versioned encryption | Implemented |
 | NIP-46 | Nostr Connect (bunker) | Implemented |
 
+## Security
+
+v0.2.0 was red-team audited with 15 findings fixed:
+
+- **Identity files** encrypted with ChaCha20-Poly1305 AEAD (PBKDF2 600K iterations)
+- **Private key validation** rejects zero keys and out-of-range values
+- **Relay SSRF protection** blocks localhost, private IPs, reserved addresses
+- **Path traversal protection** on identity save/load
+- **Bunker response verification** confirms signer pubkey matches expected remote
+- **NIP-44 spec compliance** — correct padding algorithm and ECDH output
+- **Constant-time comparisons** via `hmac.compare_digest` for all secret checks
+- **No key material in logs** — bunker logs scrubbed to DEBUG with type-only info
+- **49 tests** covering keys, events, identity, crypto, relay validation, and edge cases
+
+**Dependencies:** `cryptography` (OpenSSL-backed, ships binary wheels), `websockets`, `bech32`. No C compiler required.
+
 ## OpenClaw Skill (ClawHub)
 
 This repo includes an OpenClaw skill in `clawhub/` so AI agents can discover and use NostrKey directly from the [ClawHub registry](https://clawhub.ai/).
-
-**Install the skill in your OpenClaw instance:**
 
 ```bash
 clawhub install nostrkey
 ```
 
-**Or publish from source:**
+The skill teaches OpenClaw agents how to generate identities, sign events, encrypt messages, and persist keys. See `clawhub/SKILL.md` for the full skill definition.
 
-```bash
-clawhub publish ./clawhub --slug nostrkey --version 0.1.2
-```
+## Links
 
-The skill teaches OpenClaw agents how to generate identities, sign events, encrypt messages, and persist keys — all using the `nostrkey` pip package under the hood. See `clawhub/SKILL.md` for the full skill definition.
+- **PyPI:** https://pypi.org/project/nostrkey/
+- **ClawHub:** https://clawhub.ai/skills/nostrkey
+- **Docs:** https://nostrkey.com/python
+- **OpenClaw:** https://loginwithnostr.com/openclaw
 
 ## License
 
