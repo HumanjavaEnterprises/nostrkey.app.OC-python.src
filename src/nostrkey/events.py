@@ -8,7 +8,8 @@ import json
 import time
 from dataclasses import dataclass, field
 
-import secp256k1
+from nostrkey._secp256k1 import schnorr_sign as _schnorr_sign
+from nostrkey._secp256k1 import schnorr_verify as _schnorr_verify
 
 
 @dataclass
@@ -88,8 +89,7 @@ def sign_event(private_key_hex: str, event: UnsignedEvent) -> NostrEvent:
     pubkey = private_key_to_public_key(private_key_hex)
     event_id = compute_event_id(pubkey, event)
 
-    privkey = secp256k1.PrivateKey(bytes.fromhex(private_key_hex))
-    sig = privkey.schnorr_sign(bytes.fromhex(event_id), bip340tag=None, raw=True)
+    sig = _schnorr_sign(bytes.fromhex(private_key_hex), bytes.fromhex(event_id))
 
     return NostrEvent(
         id=event_id,
@@ -114,10 +114,9 @@ def verify_event(event: NostrEvent) -> bool:
     if not hmac.compare_digest(expected_id, event.id):
         return False
 
-    pubkey = secp256k1.PublicKey(b"\x02" + bytes.fromhex(event.pubkey), raw=True)
     try:
-        return pubkey.schnorr_verify(
-            bytes.fromhex(event.id), bytes.fromhex(event.sig), bip340tag=None, raw=True
+        return _schnorr_verify(
+            bytes.fromhex(event.pubkey), bytes.fromhex(event.id), bytes.fromhex(event.sig)
         )
     except Exception:
         return False

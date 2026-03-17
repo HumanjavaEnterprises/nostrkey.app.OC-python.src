@@ -10,8 +10,10 @@ import base64
 import hashlib
 import hmac as hmac_module
 import json
-import os
+import secrets
 from dataclasses import dataclass
+
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from nostrkey.events import NostrEvent, UnsignedEvent, sign_event
 from nostrkey.keys import (
@@ -94,25 +96,25 @@ class Identity:
     def save(self, filepath: str, passphrase: str) -> None:
         """Save the identity to an encrypted file.
 
+        Uses PBKDF2 key derivation and ChaCha20-Poly1305 AEAD encryption.
+
         Args:
             filepath: Path to save the identity file.
             passphrase: Passphrase to encrypt the private key.
         """
-        salt = os.urandom(16)
+        salt = secrets.token_bytes(16)
         key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, 600_000)
+        nonce = secrets.token_bytes(12)
 
-        # XOR encrypt the private key with the derived key
         privkey_bytes = bytes.fromhex(self._private_key_hex)
-        encrypted = bytes(a ^ b for a, b in zip(privkey_bytes, key))
-
-        # HMAC-SHA256 over salt + encrypted for authentication
-        mac = hmac_module.new(key, salt + encrypted, hashlib.sha256).digest()
+        aead = ChaCha20Poly1305(key)
+        encrypted = aead.encrypt(nonce, privkey_bytes, salt)
 
         data = {
-            "version": 2,
+            "version": 3,
             "npub": self.npub,
             "salt": base64.b64encode(salt).decode(),
-            "hmac": base64.b64encode(mac).decode(),
+            "nonce": base64.b64encode(nonce).decode(),
             "encrypted_nsec": base64.b64encode(encrypted).decode(),
         }
 
@@ -122,6 +124,9 @@ class Identity:
     @classmethod
     def load(cls, filepath: str, passphrase: str) -> Identity:
         """Load an identity from an encrypted file.
+
+        Supports version 1 (XOR, no auth), version 2 (XOR + HMAC),
+        and version 3 (ChaCha20-Poly1305 AEAD).
 
         Args:
             filepath: Path to the identity file.
@@ -137,16 +142,26 @@ class Identity:
             data = json.load(f)
 
         version = data.get("version")
-        if version not in (1, 2):
+        if version not in (1, 2, 3):
             raise ValueError(f"Unsupported identity file version: {version}")
 
         salt = base64.b64decode(data["salt"])
         encrypted = base64.b64decode(data["encrypted_nsec"])
 
+        if version == 3:
+            key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, 600_000)
+            nonce = base64.b64decode(data["nonce"])
+            aead = ChaCha20Poly1305(key)
+            try:
+                privkey_bytes = aead.decrypt(nonce, encrypted, salt)
+            except Exception:
+                raise ValueError("Invalid passphrase or corrupted file")
+            return cls.from_hex(privkey_bytes.hex())
+
+        # Legacy v1/v2 support
         iterations = 600_000 if version == 2 else 100_000
         key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, iterations)
 
-        # Verify HMAC if present (version 2)
         if version == 2:
             stored_mac = base64.b64decode(data["hmac"])
             expected_mac = hmac_module.new(key, salt + encrypted, hashlib.sha256).digest()
@@ -155,6 +170,22 @@ class Identity:
 
         privkey_bytes = bytes(a ^ b for a, b in zip(encrypted, key))
         return cls.from_hex(privkey_bytes.hex())
+
+    def wipe(self) -> None:
+        """Best-effort zeroing of private key material from memory.
+
+        Call this when the identity is no longer needed. Note: CPython
+        string interning means this cannot guarantee full erasure, but
+        it removes the direct references.
+        """
+        self._private_key_hex = "0" * 64
+        self._public_key_hex = "0" * 64
+
+    def __del__(self) -> None:
+        try:
+            self.wipe()
+        except Exception:
+            pass
 
     def __repr__(self) -> str:
         return f"Identity(npub={self.npub[:20]}...)"

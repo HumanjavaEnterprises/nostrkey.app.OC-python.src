@@ -17,6 +17,7 @@ import websockets
 from nostrkey.crypto import decrypt, encrypt
 from nostrkey.events import NostrEvent, UnsignedEvent, sign_event
 from nostrkey.keys import private_key_to_public_key
+from nostrkey.relay import validate_relay_url
 
 
 logger = logging.getLogger(__name__)
@@ -58,13 +59,7 @@ class BunkerClient:
         if not relays:
             raise ValueError("Bunker URL must include a relay parameter")
         self._relay_url = relays[0]
-
-        # Validate relay URL scheme
-        relay_parsed = urlparse(self._relay_url)
-        if relay_parsed.scheme not in ("ws", "wss"):
-            raise ValueError(
-                f"Invalid relay URL scheme '{relay_parsed.scheme}': must be ws:// or wss://"
-            )
+        validate_relay_url(self._relay_url)
 
         self._ws = await websockets.connect(self._relay_url, open_timeout=30)
 
@@ -152,7 +147,7 @@ class BunkerClient:
                     if response.get("id") == request_id:
                         return response
                 except (json.JSONDecodeError, ValueError, KeyError) as exc:
-                    logger.warning("Failed to process bunker response: %s", exc)
+                    logger.debug("Failed to process bunker response: %s", type(exc).__name__)
                     continue
             elif data[0] == "EOSE":
                 continue

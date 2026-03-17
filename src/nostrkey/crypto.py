@@ -4,18 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
+import secrets
 import struct
 
-import secp256k1
+from nostrkey._secp256k1 import ecdh as _ecdh
 
 
 def _compute_shared_secret(private_key_hex: str, public_key_hex: str) -> bytes:
     """Compute the shared secret between two keys using ECDH."""
-    privkey = secp256k1.PrivateKey(bytes.fromhex(private_key_hex))
-    pubkey = secp256k1.PublicKey(b"\x02" + bytes.fromhex(public_key_hex), raw=True)
-    shared = privkey.ecdh(pubkey.serialize(compressed=True))
-    return shared
+    return _ecdh(bytes.fromhex(private_key_hex), bytes.fromhex(public_key_hex))
 
 
 def _hkdf_extract(salt: bytes, ikm: bytes) -> bytes:
@@ -87,7 +84,7 @@ def encrypt(sender_nsec: str, recipient_npub: str, plaintext: str) -> str:
     shared_secret = _compute_shared_secret(privkey_hex, pubkey_hex)
     conversation_key = _hkdf_extract(b"nip44-v2", shared_secret)
 
-    nonce = os.urandom(32)
+    nonce = secrets.token_bytes(32)
     keys = _hkdf_expand(conversation_key, nonce, 76)
     chacha_key = keys[:32]
     chacha_nonce = keys[32:44]
