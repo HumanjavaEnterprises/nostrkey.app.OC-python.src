@@ -55,9 +55,29 @@ def _validate_hex_key(hex_str: str, name: str = "key") -> None:
         raise ValueError(f"Invalid {name}: must be 64 hex characters")
 
 
+N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+
+
+def _validate_private_key(hex_str: str) -> None:
+    """Validate that a string is a valid secp256k1 private key.
+
+    Checks format (64 hex chars) and range (1 <= d < N).
+
+    Args:
+        hex_str: The hex string to validate.
+
+    Raises:
+        ValueError: If the key is invalid or out of range.
+    """
+    _validate_hex_key(hex_str, "private key")
+    d = int(hex_str, 16)
+    if d == 0 or d >= N:
+        raise ValueError("Invalid private key: out of valid range")
+
+
 def private_key_to_public_key(private_key_hex: str) -> str:
     """Derive the public key from a private key."""
-    _validate_hex_key(private_key_hex, "private key")
+    _validate_private_key(private_key_hex)
     return private_to_public(bytes.fromhex(private_key_hex)).hex()
 
 

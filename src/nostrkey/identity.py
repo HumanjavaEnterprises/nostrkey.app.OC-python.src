@@ -10,20 +10,30 @@ import base64
 import hashlib
 import hmac as hmac_module
 import json
+import os
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from nostrkey.events import NostrEvent, UnsignedEvent, sign_event
 from nostrkey.keys import (
     _validate_hex_key,
+    _validate_private_key,
     generate_keypair,
     hex_to_npub,
     hex_to_nsec,
     nsec_to_hex,
     private_key_to_public_key,
 )
+
+
+def _validate_path(filepath: str) -> str:
+    """Resolve and validate a file path against path traversal attacks."""
+    resolved = os.path.realpath(filepath)
+    if ".." in resolved:
+        raise ValueError(f"Invalid path: path traversal detected in {filepath!r}")
+    return resolved
 
 
 @dataclass
@@ -34,8 +44,8 @@ class Identity:
     saving/loading identity files, and accessing key formats.
     """
 
-    _private_key_hex: str
-    _public_key_hex: str
+    _private_key_hex: str = field(repr=False)
+    _public_key_hex: str = field(repr=False)
 
     @classmethod
     def generate(cls) -> Identity:
@@ -53,7 +63,7 @@ class Identity:
     @classmethod
     def from_hex(cls, private_key_hex: str) -> Identity:
         """Create an identity from an existing hex private key."""
-        _validate_hex_key(private_key_hex, "private key")
+        _validate_private_key(private_key_hex)
         pubkey_hex = private_key_to_public_key(private_key_hex)
         return cls(_private_key_hex=private_key_hex, _public_key_hex=pubkey_hex)
 
@@ -102,6 +112,7 @@ class Identity:
             filepath: Path to save the identity file.
             passphrase: Passphrase to encrypt the private key.
         """
+        filepath = _validate_path(filepath)
         salt = secrets.token_bytes(16)
         key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, 600_000)
         nonce = secrets.token_bytes(12)
@@ -138,11 +149,16 @@ class Identity:
         Raises:
             ValueError: If the passphrase is wrong or the file is corrupted.
         """
+        filepath = _validate_path(filepath)
         with open(filepath) as f:
             data = json.load(f)
 
         version = data.get("version")
-        if version not in (1, 2, 3):
+        if version not in (2, 3):
+            if version == 1:
+                raise ValueError(
+                    "Version 1 identity files are no longer supported — re-save with a current version"
+                )
             raise ValueError(f"Unsupported identity file version: {version}")
 
         salt = base64.b64decode(data["salt"])
@@ -158,15 +174,12 @@ class Identity:
                 raise ValueError("Invalid passphrase or corrupted file")
             return cls.from_hex(privkey_bytes.hex())
 
-        # Legacy v1/v2 support
-        iterations = 600_000 if version == 2 else 100_000
-        key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, iterations)
-
-        if version == 2:
-            stored_mac = base64.b64decode(data["hmac"])
-            expected_mac = hmac_module.new(key, salt + encrypted, hashlib.sha256).digest()
-            if not hmac_module.compare_digest(stored_mac, expected_mac):
-                raise ValueError("Invalid passphrase or corrupted file")
+        # Legacy v2 support
+        key = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, 600_000)
+        stored_mac = base64.b64decode(data["hmac"])
+        expected_mac = hmac_module.new(key, salt + encrypted, hashlib.sha256).digest()
+        if not hmac_module.compare_digest(stored_mac, expected_mac):
+            raise ValueError("Invalid passphrase or corrupted file")
 
         privkey_bytes = bytes(a ^ b for a, b in zip(encrypted, key))
         return cls.from_hex(privkey_bytes.hex())
