@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import uuid
 from typing import AsyncIterator
@@ -11,6 +12,45 @@ from urllib.parse import urlparse
 import websockets
 
 from nostrkey.events import NostrEvent
+
+
+def validate_relay_url(url: str) -> None:
+    """Validate a relay URL for scheme and SSRF safety.
+
+    Blocks localhost, private IPs, link-local, and reserved addresses
+    to prevent SSRF when relay URLs come from untrusted sources.
+
+    Args:
+        url: The relay WebSocket URL to validate.
+
+    Raises:
+        ValueError: If the URL is invalid or points to a private address.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("ws", "wss"):
+        raise ValueError(
+            f"Invalid relay URL scheme '{parsed.scheme}': must be ws:// or wss://"
+        )
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Relay URL must include a hostname")
+
+    # Check for localhost aliases
+    if hostname in ("localhost", "0.0.0.0"):
+        raise ValueError(f"Relay URL must not point to localhost: {hostname}")
+
+    # Check for private/reserved IP addresses
+    try:
+        addr = ipaddress.ip_address(hostname)
+        if addr.is_loopback or addr.is_private or addr.is_link_local or addr.is_reserved:
+            raise ValueError(
+                f"Relay URL must not point to a private or reserved address: {hostname}"
+            )
+    except ValueError as exc:
+        # Re-raise our own ValueErrors, skip if it's just "not an IP" (i.e. a hostname)
+        if "Relay URL" in str(exc):
+            raise
 
 
 class RelayClient:
@@ -25,11 +65,7 @@ class RelayClient:
     """
 
     def __init__(self, url: str):
-        parsed = urlparse(url)
-        if parsed.scheme not in ("ws", "wss"):
-            raise ValueError(
-                f"Invalid relay URL scheme '{parsed.scheme}': must be ws:// or wss://"
-            )
+        validate_relay_url(url)
         self.url = url
         self._ws = None
 

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import os
-
 import bech32
-import secp256k1
+
+from nostrkey._secp256k1 import generate_keypair_bytes, private_to_public
 
 
 def generate_keypair() -> tuple[str, str]:
@@ -14,10 +13,8 @@ def generate_keypair() -> tuple[str, str]:
     Returns:
         Tuple of (private_key_hex, public_key_hex).
     """
-    private_key_bytes = os.urandom(32)
-    privkey = secp256k1.PrivateKey(private_key_bytes)
-    public_key_bytes = privkey.pubkey.serialize(compressed=True)[1:]  # x-only pubkey
-    return private_key_bytes.hex(), public_key_bytes.hex()
+    priv_bytes, pub_bytes = generate_keypair_bytes()
+    return priv_bytes.hex(), pub_bytes.hex()
 
 
 def hex_to_nsec(private_key_hex: str) -> str:
@@ -61,8 +58,7 @@ def _validate_hex_key(hex_str: str, name: str = "key") -> None:
 def private_key_to_public_key(private_key_hex: str) -> str:
     """Derive the public key from a private key."""
     _validate_hex_key(private_key_hex, "private key")
-    privkey = secp256k1.PrivateKey(bytes.fromhex(private_key_hex))
-    return privkey.pubkey.serialize(compressed=True)[1:].hex()
+    return private_to_public(bytes.fromhex(private_key_hex)).hex()
 
 
 def _bech32_encode(hrp: str, data: bytes) -> str:
