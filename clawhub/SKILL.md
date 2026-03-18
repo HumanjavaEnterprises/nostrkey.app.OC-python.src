@@ -1,6 +1,6 @@
 ---
 name: nostrkey
-description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, persist identity. Red-team audited, 49 tests, zero C dependencies.
+description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, BIP-39 seed phrases, portable backup tokens. 69 tests, zero C dependencies.
 version: 0.2.1
 metadata:
   openclaw:
@@ -121,16 +121,28 @@ plaintext = decrypt(
 )
 ```
 
-### Save and Load Identity (Encrypted File)
+### Backup and Restore
 
-Persist your identity between sessions:
+Three formats -- choose what fits your context:
 
 ```python
-# Save (encrypted with passphrase)
-me.save("my-identity.nostrkey", passphrase="strong-passphrase")
+# 1. Seed phrase -- 12 words, write on paper, deterministic (NIP-06)
+me, phrase = Identity.generate_with_seed()
+print(phrase)  # "adult carpet exit glance grant office ..."
+restored = Identity.from_seed(phrase)  # same keys every time
 
-# Load later
-me = Identity.load("my-identity.nostrkey", passphrase="strong-passphrase")
+# 2. Encrypted token -- paste into a password manager or env var
+token = me.export_token(passphrase="strong-passphrase")
+# "nostrkey:v3:base64data..."
+restored = Identity.from_token(token, passphrase="strong-passphrase")
+
+# 3. Encrypted file -- persistent storage
+me.save("my-identity.nostrkey", passphrase="strong-passphrase")
+restored = Identity.load("my-identity.nostrkey", passphrase="strong-passphrase")
+
+# Backup card -- structured view of all key formats
+card = me.backup_card()
+# {"npub": "npub1...", "nsec": "nsec1...", "public_key_hex": "...", "warning": "..."}
 ```
 
 ### Delegated Signing via NIP-46 Bunker
@@ -156,7 +168,10 @@ signed = await bunker.sign_event(kind=1, content="Human-approved action")
 | Subscribe to events | `nostrkey.relay` | `RelayClient.subscribe()` |
 | Encrypt messages | `nostrkey.crypto` | `encrypt()` / `decrypt()` |
 | Delegated signing | `nostrkey.bunker` | `BunkerClient.sign_event()` |
-| Save/load identity | `nostrkey` | `identity.save()` / `Identity.load()` |
+| Backup with seed phrase | `nostrkey` | `Identity.generate_with_seed()` / `Identity.from_seed()` |
+| Backup with token | `nostrkey` | `identity.export_token()` / `Identity.from_token()` |
+| Backup card | `nostrkey` | `identity.backup_card()` |
+| Save/load identity file | `nostrkey` | `identity.save()` / `Identity.load()` |
 | Low-level key ops | `nostrkey.keys` | `generate_keypair()`, `hex_to_npub()`, etc. |
 
 ## Response Format
