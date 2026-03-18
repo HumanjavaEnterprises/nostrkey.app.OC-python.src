@@ -8,6 +8,9 @@ metadata:
       bins:
         - pip
     install:
+      - kind: pip
+        package: nostrkey
+        bins: []
       - kind: uv
         package: nostrkey
         bins: []
