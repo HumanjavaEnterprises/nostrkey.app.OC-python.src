@@ -54,3 +54,71 @@ def test_repr():
     bot = Identity.generate()
     assert "Identity(npub=" in repr(bot)
     assert str(bot).startswith("npub1")
+
+
+def test_backup_card():
+    bot = Identity.generate()
+    card = bot.backup_card()
+    assert card["npub"].startswith("npub1")
+    assert card["nsec"].startswith("nsec1")
+    assert len(card["public_key_hex"]) == 64
+    assert "warning" in card
+
+
+def test_export_and_restore_token():
+    bot = Identity.generate()
+    passphrase = "my-secret-phrase"
+    token = bot.export_token(passphrase)
+
+    assert token.startswith("nostrkey:v3:")
+
+    restored = Identity.from_token(token, passphrase)
+    assert restored.npub == bot.npub
+    assert restored.nsec == bot.nsec
+
+
+def test_token_wrong_passphrase():
+    bot = Identity.generate()
+    token = bot.export_token("correct-passphrase")
+
+    try:
+        Identity.from_token(token, "wrong-passphrase")
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "Invalid passphrase" in str(e)
+
+
+def test_token_invalid_format():
+    try:
+        Identity.from_token("garbage", "passphrase")
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "Invalid token format" in str(e)
+
+
+def test_token_empty_passphrase():
+    bot = Identity.generate()
+    try:
+        bot.export_token("")
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "empty" in str(e).lower()
+
+
+def test_token_roundtrip_different_identities():
+    """Two different identities produce different tokens."""
+    bot1 = Identity.generate()
+    bot2 = Identity.generate()
+    passphrase = "same-passphrase"
+
+    token1 = bot1.export_token(passphrase)
+    token2 = bot2.export_token(passphrase)
+
+    assert token1 != token2
+
+    restored1 = Identity.from_token(token1, passphrase)
+    restored2 = Identity.from_token(token2, passphrase)
+
+    assert restored1.npub == bot1.npub
+    assert restored2.npub == bot2.npub
+    assert restored1.npub != restored2.npub
