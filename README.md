@@ -4,7 +4,7 @@
 
 A Python SDK for OpenClaw AI entities to generate Nostr keypairs, sign events, encrypt data, and manage their own identity on the Nostr protocol.
 
-**v0.2.0** — Security hardened. 49 tests. Zero C dependencies. `pip install nostrkey` just works.
+**v0.2.1** — BIP-39 seed phrases, portable backup tokens, 69 tests. Zero C dependencies. `pip install nostrkey` just works.
 
 ## Why?
 
@@ -56,14 +56,29 @@ async def publish():
 asyncio.run(publish())
 ```
 
-## Save & Load Identity
+## Backup & Restore
+
+Three ways to back up an identity — choose what fits your context:
 
 ```python
-# Save identity to file (encrypted with ChaCha20-Poly1305 AEAD)
-bot.save("my-bot.nostrkey", passphrase="strong-passphrase")
+# 1. Seed phrase — 12 words, write on paper, deterministic
+bot, phrase = Identity.generate_with_seed()
+print(phrase)  # "adult carpet exit glance grant office ..."
+restored = Identity.from_seed(phrase)  # same keys every time
 
-# Load it back
-bot = Identity.load("my-bot.nostrkey", passphrase="strong-passphrase")
+# 2. Encrypted token — paste into a password manager or env var
+token = bot.export_token(passphrase="strong-passphrase")
+print(token)  # "nostrkey:v3:base64data..."
+restored = Identity.from_token(token, passphrase="strong-passphrase")
+
+# 3. Encrypted file — persistent storage
+bot.save("my-bot.nostrkey", passphrase="strong-passphrase")
+restored = Identity.load("my-bot.nostrkey", passphrase="strong-passphrase")
+
+# Backup card — structured view of all key formats
+card = bot.backup_card()
+print(card["npub"])     # public key
+print(card["nsec"])     # private key — store securely!
 ```
 
 ## NIP-44 Encryption
@@ -105,7 +120,8 @@ async def delegated_sign():
 
 | Module | What |
 |--------|------|
-| `nostrkey.identity` | High-level identity management — generate, import, sign, save, load |
+| `nostrkey.identity` | High-level identity management — generate, import, sign, save, load, seed phrases, tokens |
+| `nostrkey.seed` | BIP-39 seed phrase generation, validation, and NIP-06 key derivation |
 | `nostrkey.keys` | Keypair generation, bech32 encoding (npub/nsec), hex conversion |
 | `nostrkey.events` | Create, serialize, hash, and sign Nostr events (NIP-01) |
 | `nostrkey.crypto` | NIP-44 versioned encryption and decryption |
@@ -118,6 +134,7 @@ async def delegated_sign():
 |-----|------|--------|
 | NIP-01 | Basic protocol (events, signing) | Implemented |
 | NIP-04 | Encrypted DMs (legacy) | Implemented |
+| NIP-06 | Key derivation from seed phrase | Implemented |
 | NIP-19 | bech32 encoding (npub/nsec/note) | Implemented |
 | NIP-44 | Versioned encryption | Implemented |
 | NIP-46 | Nostr Connect (bunker) | Implemented |
@@ -134,9 +151,11 @@ v0.2.0 was red-team audited with 15 findings fixed:
 - **NIP-44 spec compliance** — correct padding algorithm and ECDH output
 - **Constant-time comparisons** via `hmac.compare_digest` for all secret checks
 - **No key material in logs** — bunker logs scrubbed to DEBUG with type-only info
-- **49 tests** covering keys, events, identity, crypto, relay validation, and edge cases
+- **BIP-39 seed phrases** with correct y-parity BIP-32 derivation and zero-key guards
+- **Portable encrypted tokens** using the same ChaCha20-Poly1305 AEAD as file save
+- **69 tests** covering keys, events, identity, crypto, seed phrases, tokens, relay validation, and edge cases
 
-**Dependencies:** `cryptography` (OpenSSL-backed, ships binary wheels), `websockets`, `bech32`. No C compiler required.
+**Dependencies:** `cryptography` (OpenSSL-backed, ships binary wheels), `websockets`, `bech32`, `mnemonic`. No C compiler required.
 
 ## OpenClaw Skill (ClawHub)
 
