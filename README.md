@@ -4,7 +4,7 @@
 
 A Python SDK for OpenClaw AI entities to generate Nostr keypairs, sign events, encrypt data, and manage their own identity on the Nostr protocol.
 
-**v0.2.1** — BIP-39 seed phrases, portable backup tokens, 69 tests. Zero C dependencies. `pip install nostrkey` just works.
+**v0.2.3** — OC-ready identity onboarding, support_skills for manual deployment, BIP-39 seed phrases, portable backup tokens, 69 tests. Zero C dependencies. `pip install nostrkey` just works.
 
 ## Why?
 
@@ -157,15 +157,89 @@ v0.2.0 was red-team audited with 15 findings fixed:
 
 **Dependencies:** `cryptography` (OpenSSL-backed, ships binary wheels), `websockets`, `bech32`, `mnemonic`. No C compiler required.
 
-## OpenClaw Skill (ClawHub)
+## OpenClaw Deployment
 
-This repo includes an OpenClaw skill in `clawhub/` so AI agents can discover and use NostrKey directly from the [ClawHub registry](https://clawhub.ai/).
+### Quick Start (ClawHub)
+
+If your OC version supports it:
 
 ```bash
 clawhub install nostrkey
 ```
 
-The skill teaches OpenClaw agents how to generate identities, sign events, encrypt messages, and persist keys. See `clawhub/SKILL.md` for the full skill definition.
+### Manual Setup
+
+Most OC deployments today can't use `clawhub install` — agents may not recognize the command, can't install pip packages at runtime (read-only filesystem), and can't discover files added to the workspace after bootstrap.
+
+The `support_skills/` folder contains ready-to-deploy workspace files that solve all three problems. See [`support_skills/README.md`](support_skills/README.md) for the full walkthrough.
+
+**Short version:**
+
+1. Add `nostrkey` to your Dockerfile:
+   ```dockerfile
+   RUN pip3 install --no-cache-dir --break-system-packages nostrkey==0.2.3
+   ```
+2. Copy `support_skills/nostrkey-SKILL.md` into your OC workspace
+3. Paste the snippet from `support_skills/TOOLS-snippet.md` into your agent's `TOOLS.md` so it knows the skill exists
+
+### Import an Existing Identity
+
+To import keys into a running OC container from the host (keeps your nsec out of chat):
+
+```bash
+docker exec -i <container> python3 -c "
+from nostrkey import Identity
+me = Identity.from_nsec(input('nsec: '))
+passphrase = input('passphrase: ')
+me.save('/home/openclaw/.openclaw/workspace/my-identity.nostrkey', passphrase=passphrase)
+print(f'Saved. npub: {me.npub}')
+"
+```
+
+The agent can then load the identity at runtime:
+```python
+me = Identity.load("my-identity.nostrkey", passphrase=os.environ["NOSTRKEY_PASSPHRASE"])
+```
+
+## FAQ
+
+### Why can't my OC agent find `nostrkey-SKILL.md` after I copy it in?
+
+Most OC agents don't have a file-listing tool. They only "know about" files that were present at workspace bootstrap or that are explicitly referenced in boot documents (`BOOTSTRAP.md`, `TOOLS.md`, etc.).
+
+**Fix:** Paste the snippet from `support_skills/TOOLS-snippet.md` into your agent's `TOOLS.md`. Include the **full absolute path** to the skill file — smaller models (e.g., Qwen3 8B) may not construct the correct path from just a filename.
+
+### Why doesn't `clawhub install nostrkey` work?
+
+Not all OC deployments support `clawhub install` yet. Smaller local models (e.g., Qwen3 8B) may not recognize it as a command.
+
+**Fix:** Use the manual setup in `support_skills/`. See [`support_skills/README.md`](support_skills/README.md).
+
+### Why can't my agent run `pip install nostrkey`?
+
+OC containers typically run with read-only root filesystems. The agent can execute Python code but cannot install packages.
+
+**Fix:** Bake `nostrkey` into your Docker image at build time.
+
+### My agent tried to execute the SKILL.md file as Python code
+
+Smaller models may feed the entire markdown file to the Python interpreter instead of extracting code blocks from it. The YAML frontmatter causes a syntax error at line 3.
+
+**Fix:** Use `support_skills/setup-identity.py` instead. This is a standalone Python script that smaller models can run directly. Reference it by full path in your `TOOLS.md`. The SKILL.md is for reading/reference, not execution.
+
+### My agent gets stuck in a loop editing IDENTITY.md
+
+Smaller models may fail to match exact text when using edit tools, then retry endlessly until they burn through the context window. This is especially common with 16K context models.
+
+**Fix:** The updated SKILL.md (v0.2.3+) no longer instructs agents to edit workspace files during identity setup. Update your skill doc and restart the conversation.
+
+### How do I import existing keys without exposing my nsec in chat?
+
+Don't paste raw nsec keys into the OC chat UI. Instead:
+
+- **Seed phrase** (recommended): Use `setup-identity.py restore 'word1 word2 ...' passphrase` — seed phrases are the standard recovery mechanism. Generate them during initial setup with `Identity.generate_with_seed()`.
+- **From the host**: Import via `docker exec` (see "Import an Existing Identity" above).
+- **Environment variable**: Set `NOSTR_NSEC` in your `.env` file and have the agent load it via `os.environ`.
 
 ## Links
 
