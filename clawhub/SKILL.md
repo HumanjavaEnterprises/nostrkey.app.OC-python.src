@@ -1,7 +1,12 @@
 ---
 name: nostrkey
 description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, BIP-39 seed phrases, portable backup tokens. 69 tests, zero C dependencies.
-version: 0.2.8
+version: 0.2.9
+env:
+  NOSTRKEY_PASSPHRASE:
+    description: Passphrase used to encrypt/decrypt the agent's identity file
+    required: true
+    sensitive: true
 metadata:
   openclaw:
     requires:
@@ -9,9 +14,6 @@ metadata:
         - pip
     install:
       - kind: pip
-        package: nostrkey
-        bins: []
-      - kind: uv
         package: nostrkey
         bins: []
     homepage: https://github.com/HumanjavaEnterprises/nostrkey.app.OC-python.src
