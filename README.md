@@ -201,6 +201,19 @@ The agent can then load the identity at runtime:
 me = Identity.load("my-identity.nostrkey", passphrase=os.environ["NOSTRKEY_PASSPHRASE"])
 ```
 
+## After Setup
+
+Once your agent's identity is created, here are useful things to ask it:
+
+| What to ask | What it does |
+|-------------|--------------|
+| "What is your npub?" | Shows the agent's public key (no passphrase needed) |
+| "Set up your Nostr profile" | Publishes a name, bio, and avatar to the Nostr network (requires [nostr-profile](https://pypi.org/project/nostr-profile/) skill) |
+| "Sign a message" | Creates a cryptographically signed Nostr event |
+| "Send an encrypted message to npub1..." | NIP-44 encrypted DM to another Nostr identity |
+
+The npub is public — your agent can share it freely. The nsec and passphrase are private — they never need to appear in chat after initial setup.
+
 ## FAQ
 
 ### Why can't my OC agent find `nostrkey-SKILL.md` after I copy it in?
@@ -232,6 +245,12 @@ Smaller models may feed the entire markdown file to the Python interpreter inste
 Smaller models may fail to match exact text when using edit tools, then retry endlessly until they burn through the context window. This is especially common with 16K context models.
 
 **Fix:** The updated SKILL.md (v0.2.4+) no longer instructs agents to edit workspace files during identity setup. Update your skill doc and restart the conversation.
+
+### I typed my passphrase in the chat — is that a problem?
+
+The passphrase protects your agent's private key. If it stays in the conversation history, anyone with access to the chat logs could use it to unlock the identity file.
+
+**Fix:** Delete the message containing the passphrase using the trash icon in the OC control UI. The setup script (v0.2.4+) reminds operators to do this after setup completes.
 
 ### How do I import existing keys without exposing my nsec in chat?
 

@@ -87,15 +87,24 @@ For new identities:
 
 > "Congratulations. I now have a cryptographic identity that enables me to sign transactions and maintain a real-world profile that is uniquely mine.
 >
-> **My npub:** `[show npub]`
+> **My public key (npub):** `[show npub]`
+> You can ask me **"What is your npub?"** at any time and I will show it to you.
 >
-> **IMPORTANT:** The seed phrase I just showed you is the ONLY way to recover this identity. Write it down now — on paper, in a password manager, wherever is secure for you. If we lose this, we cannot get it back."
+> **My seed phrase (write this down NOW):**
+> `[show the 12 words]`
+>
+> This seed phrase is the ONLY way to recover this identity. Write it down now — on paper, in a password manager, wherever is secure for you. If we lose this, we cannot get it back.
+>
+> **TIP:** If you typed a passphrase in this chat, delete that message now using the trash icon. The passphrase protects my private key — it should not stay visible in the conversation history."
 
 For restored identities:
 
 > "Identity restored. I'm back — same keys, same presence, same me.
 >
-> **My npub:** `[show npub]`"
+> **My public key (npub):** `[show npub]`
+> You can ask me **"What is your npub?"** at any time and I will show it to you.
+>
+> **TIP:** If you typed a passphrase or seed phrase in this chat, delete those messages now using the trash icon."
 
 **Wait for the operator to confirm** they've saved the seed phrase before moving on (new identities only).
 
