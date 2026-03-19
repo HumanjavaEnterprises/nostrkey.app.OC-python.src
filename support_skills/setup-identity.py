@@ -4,15 +4,21 @@ Run this script to generate or restore your Nostr identity.
 Usage: python3 setup-identity.py [new|restore]
 """
 import sys
+import json
 
 from nostrkey import Identity
+
+IDENTITY_FILE = "/home/openclaw/.openclaw/workspace/my-identity.nostrkey"
+PUBLIC_FILE = "/home/openclaw/.openclaw/workspace/nostr-identity.json"
 
 mode = sys.argv[1] if len(sys.argv) > 1 else "new"
 
 if mode == "new":
     passphrase = sys.argv[2] if len(sys.argv) > 2 else "changeme"
     me, seed_phrase = Identity.generate_with_seed()
-    me.save("/home/openclaw/.openclaw/workspace/my-identity.nostrkey", passphrase=passphrase)
+    me.save(IDENTITY_FILE, passphrase=passphrase)
+    with open(PUBLIC_FILE, "w") as f:
+        json.dump({"npub": me.npub, "public_key_hex": me.public_key_hex}, f, indent=2)
     print()
     print("IDENTITY_CREATED=true")
     print(f"npub: {me.npub}")
@@ -32,7 +38,9 @@ elif mode == "restore":
         print("Usage: python3 setup-identity.py restore 'word1 word2 ...' passphrase")
         sys.exit(1)
     me = Identity.from_seed(seed)
-    me.save("/home/openclaw/.openclaw/workspace/my-identity.nostrkey", passphrase=passphrase)
+    me.save(IDENTITY_FILE, passphrase=passphrase)
+    with open(PUBLIC_FILE, "w") as f:
+        json.dump({"npub": me.npub, "public_key_hex": me.public_key_hex}, f, indent=2)
     print()
     print("IDENTITY_RESTORED=true")
     print(f"npub: {me.npub}")
