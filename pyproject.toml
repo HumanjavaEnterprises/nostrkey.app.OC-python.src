@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nostrkey"
-version = "0.2.6"
+version = "0.2.7"
 description = "Nostr identity SDK for OpenClaw AI entities — generate keys, sign events, encrypt data"
 readme = "README.md"
 license = "MIT"
