@@ -24,7 +24,7 @@ Most OpenClaw deployments today have three gaps that block skill adoption:
 Add this to your Dockerfile (before switching to the non-root user):
 
 ```dockerfile
-RUN pip3 install --no-cache-dir --break-system-packages nostrkey==0.2.4
+RUN pip3 install --no-cache-dir --break-system-packages nostrkey==0.2.5
 ```
 
 Then rebuild:
