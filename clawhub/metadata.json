@@ -1,7 +1,7 @@
 {
   "slug": "nostrkey",
   "name": "NostrKey",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "summary": "Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, persist identity",
   "author": {
     "name": "Humanjava Enterprises",
@@ -31,6 +31,12 @@
   },
   "requires": {
     "python": ">=3.10"
+  },
+  "env": {
+    "NOSTRKEY_PASSPHRASE": {
+      "description": "Passphrase used to encrypt/decrypt the agent's identity file",
+      "required": true
+    }
   },
   "categories": [
     "security",

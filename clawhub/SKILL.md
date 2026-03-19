@@ -1,7 +1,7 @@
 ---
 name: nostrkey
 description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, BIP-39 seed phrases, portable backup tokens. 69 tests, zero C dependencies.
-version: 0.2.6
+version: 0.2.7
 metadata:
   openclaw:
     requires:
@@ -39,10 +39,19 @@ Say something like:
 
 ### Step 2a — New identity (if they say new/fresh/no seed phrase)
 
-Run the setup script. The passphrase is read automatically from the `NOSTRKEY_PASSPHRASE` environment variable — you do not need to ask for it.
+Run this code. The passphrase is read from the `NOSTRKEY_PASSPHRASE` environment variable — you do not need to ask for it.
 
-```bash
-python3 /home/openclaw/.openclaw/workspace/setup-identity.py new
+```python
+import os, json
+from nostrkey import Identity
+
+passphrase = os.environ["NOSTRKEY_PASSPHRASE"]
+me, seed_phrase = Identity.generate_with_seed()
+me.save("my-identity.nostrkey", passphrase=passphrase)
+with open("nostr-identity.json", "w") as f:
+    json.dump({"npub": me.npub, "public_key_hex": me.public_key_hex}, f, indent=2)
+print(f"npub: {me.npub}")
+print(f"seed_phrase: {seed_phrase}")
 ```
 
 Then tell them:
@@ -65,11 +74,18 @@ Then tell them:
 
 Ask them to type or paste their 12-word (or 24-word) seed phrase. Then run:
 
-```bash
-python3 /home/openclaw/.openclaw/workspace/setup-identity.py restore "word1 word2 word3 ..."
-```
+```python
+import os, json
+from nostrkey import Identity
 
-The passphrase is read automatically from the `NOSTRKEY_PASSPHRASE` environment variable.
+passphrase = os.environ["NOSTRKEY_PASSPHRASE"]
+seed = "word1 word2 word3 ..."  # replace with actual seed phrase
+me = Identity.from_seed(seed)
+me.save("my-identity.nostrkey", passphrase=passphrase)
+with open("nostr-identity.json", "w") as f:
+    json.dump({"npub": me.npub, "public_key_hex": me.public_key_hex}, f, indent=2)
+print(f"npub: {me.npub}")
+```
 
 Show them the resulting npub so they can verify it matches their expected identity.
 
