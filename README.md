@@ -4,7 +4,7 @@
 
 A Python SDK for OpenClaw AI entities to generate Nostr keypairs, sign events, encrypt data, and manage their own identity on the Nostr protocol.
 
-**v0.2.5** — OC-ready identity onboarding, support_skills for manual deployment, BIP-39 seed phrases, portable backup tokens, 69 tests. Zero C dependencies. `pip install nostrkey` just works.
+**v0.2.6** — OC-ready identity onboarding, support_skills for manual deployment, BIP-39 seed phrases, portable backup tokens, 69 tests. Zero C dependencies. `pip install nostrkey` just works.
 
 ## Why?
 
@@ -177,10 +177,11 @@ The `support_skills/` folder contains ready-to-deploy workspace files that solve
 
 1. Add `nostrkey` to your Dockerfile:
    ```dockerfile
-   RUN pip3 install --no-cache-dir --break-system-packages nostrkey==0.2.5
+   RUN pip3 install --no-cache-dir --break-system-packages nostrkey==0.2.6
    ```
-2. Copy `support_skills/nostrkey-SKILL.md` into your OC workspace
-3. Paste the snippet from `support_skills/TOOLS-snippet.md` into your agent's `TOOLS.md` so it knows the skill exists
+2. Add `NOSTRKEY_PASSPHRASE=yourpassphrase` to your `.env` file so the agent can sign autonomously without asking the operator each time
+3. Copy `support_skills/setup-identity.py`, `support_skills/show-identity.py`, and `support_skills/nostrkey-SKILL.md` into your OC workspace
+4. Paste the snippet from `support_skills/TOOLS-snippet.md` into your agent's `TOOLS.md` so it knows the skill exists
 
 ### Import an Existing Identity
 
@@ -244,13 +245,13 @@ Smaller models may feed the entire markdown file to the Python interpreter inste
 
 Smaller models may fail to match exact text when using edit tools, then retry endlessly until they burn through the context window. This is especially common with 16K context models.
 
-**Fix:** The updated SKILL.md (v0.2.5+) no longer instructs agents to edit workspace files during identity setup. Update your skill doc and restart the conversation.
+**Fix:** The updated SKILL.md (v0.2.6+) no longer instructs agents to edit workspace files during identity setup. Update your skill doc and restart the conversation.
 
 ### I typed my passphrase in the chat — is that a problem?
 
 The passphrase protects your agent's private key. If it stays in the conversation history, anyone with access to the chat logs could use it to unlock the identity file.
 
-**Fix:** Delete the message containing the passphrase using the trash icon in the OC control UI. The setup script (v0.2.5+) reminds operators to do this after setup completes.
+**Fix:** Delete the message containing the passphrase using the trash icon in the OC control UI. The setup script (v0.2.6+) reminds operators to do this after setup completes.
 
 ### How do I import existing keys without exposing my nsec in chat?
 

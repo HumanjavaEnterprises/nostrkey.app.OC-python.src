@@ -2,9 +2,12 @@
 NostrKey Identity Setup
 Run this script to generate or restore your Nostr identity.
 Usage: python3 setup-identity.py [new|restore]
+
+Passphrase is read from NOSTRKEY_PASSPHRASE env var, or passed as argument.
 """
-import sys
 import json
+import os
+import sys
 
 from nostrkey import Identity
 
@@ -13,8 +16,18 @@ PUBLIC_FILE = "/home/openclaw/.openclaw/workspace/nostr-identity.json"
 
 mode = sys.argv[1] if len(sys.argv) > 1 else "new"
 
+def get_passphrase(arg_index):
+    """Get passphrase from arg, env var, or fail."""
+    if len(sys.argv) > arg_index:
+        return sys.argv[arg_index]
+    passphrase = os.environ.get("NOSTRKEY_PASSPHRASE")
+    if passphrase:
+        return passphrase
+    print("ERROR: No passphrase provided. Set NOSTRKEY_PASSPHRASE env var or pass as argument.")
+    sys.exit(1)
+
 if mode == "new":
-    passphrase = sys.argv[2] if len(sys.argv) > 2 else "changeme"
+    passphrase = get_passphrase(2)
     me, seed_phrase = Identity.generate_with_seed()
     me.save(IDENTITY_FILE, passphrase=passphrase)
     with open(PUBLIC_FILE, "w") as f:
@@ -40,7 +53,7 @@ if mode == "new":
 
 elif mode == "restore":
     seed = sys.argv[2] if len(sys.argv) > 2 else None
-    passphrase = sys.argv[3] if len(sys.argv) > 3 else "changeme"
+    passphrase = get_passphrase(3)
     if not seed:
         print("Usage: python3 setup-identity.py restore 'word1 word2 ...' passphrase")
         sys.exit(1)
