@@ -1,7 +1,7 @@
 ---
 name: nostrkey
 description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, BIP-39 seed phrases, portable backup tokens. 69 tests, zero C dependencies.
-version: 0.2.5
+version: 0.2.6
 metadata:
   openclaw:
     requires:
@@ -39,16 +39,11 @@ Say something like:
 
 ### Step 2a — New identity (if they say new/fresh/no seed phrase)
 
-Run this code:
+Run the setup script. The passphrase is read automatically from the `NOSTRKEY_PASSPHRASE` environment variable — you do not need to ask for it.
 
-```python
-from nostrkey import Identity
-
-me, seed_phrase = Identity.generate_with_seed()
-me.save("my-identity.nostrkey", passphrase="USE_A_REAL_PASSPHRASE")
+```bash
+python3 /home/openclaw/.openclaw/workspace/setup-identity.py new
 ```
-
-**Important:** Ask the operator to choose a passphrase for encrypting the identity file before running the save. Do not hardcode a passphrase.
 
 Then tell them:
 
@@ -68,14 +63,13 @@ Then tell them:
 
 ### Step 2b — Restore from seed phrase (if they have one)
 
-Ask them to type or paste their 12-word (or 24-word) seed phrase. Then:
+Ask them to type or paste their 12-word (or 24-word) seed phrase. Then run:
 
-```python
-from nostrkey import Identity
-
-me = Identity.from_seed("word1 word2 word3 ...")
-me.save("my-identity.nostrkey", passphrase="OPERATOR_CHOSEN_PASSPHRASE")
+```bash
+python3 /home/openclaw/.openclaw/workspace/setup-identity.py restore "word1 word2 word3 ..."
 ```
+
+The passphrase is read automatically from the `NOSTRKEY_PASSPHRASE` environment variable.
 
 Show them the resulting npub so they can verify it matches their expected identity.
 
