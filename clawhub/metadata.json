@@ -1,7 +1,7 @@
 {
   "slug": "nostrkey",
   "name": "NostrKey",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "summary": "Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, persist identity",
   "author": {
     "name": "Humanjava Enterprises",
