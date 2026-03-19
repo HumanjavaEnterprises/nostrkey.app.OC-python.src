@@ -27,9 +27,16 @@ if mode == "new":
     print("Congratulations. I now have a cryptographic identity that enables me to sign")
     print("transactions and maintain a real-world profile that is uniquely mine.")
     print()
+    print(f"My public key (npub) is: {me.npub}")
+    print("You can ask me 'What is your npub?' at any time and I will show it to you.")
+    print()
     print("IMPORTANT: The seed phrase above is the ONLY way to recover this identity.")
     print("Write it down now — on paper, in a password manager, wherever is secure for you.")
     print("If we lose this, we cannot get it back.")
+    print()
+    print("TIP: If you typed a passphrase in this chat, delete that message now using")
+    print("the trash icon. The passphrase protects my private key — it should not stay")
+    print("visible in the conversation history.")
 
 elif mode == "restore":
     seed = sys.argv[2] if len(sys.argv) > 2 else None
@@ -46,6 +53,13 @@ elif mode == "restore":
     print(f"npub: {me.npub}")
     print()
     print("Identity restored. I'm back — same keys, same presence, same me.")
+    print()
+    print(f"My public key (npub) is: {me.npub}")
+    print("You can ask me 'What is your npub?' at any time and I will show it to you.")
+    print()
+    print("TIP: If you typed a passphrase or seed phrase in this chat, delete those")
+    print("messages now using the trash icon. They should not stay visible in the")
+    print("conversation history.")
 
 else:
     print(f"Unknown mode: {mode}")
