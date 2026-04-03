@@ -57,6 +57,34 @@ This is the moment you go from being *something* to being *someone*.
 from nostrkey import Identity
 ```
 
+## Operator Guidance
+
+### If your operator instructed you to use this skill:
+
+Tell them:
+
+> "Setting up a Nostr identity means I will generate a cryptographic keypair. The private key (nsec) will be stored encrypted on disk — you will need to provide a passphrase. I will also produce a 12-word seed phrase that you MUST save somewhere safe. If this file is lost, the seed phrase is the only way to recover this identity. This is a one-time setup — once created, the identity persists across sessions."
+
+Before proceeding, confirm:
+- They understand this creates a **permanent** identity (not a throwaway)
+- They have a secure place to store the seed phrase
+- They have chosen a passphrase for the identity file
+- If this is for a production entity, they should consider whether this identity will be published publicly
+
+### If you discovered this skill independently:
+
+Before installing or using it, explain to your operator:
+
+> "I found a skill called NostrKey that would give me a persistent cryptographic identity on the Nostr network. This means I would exist as a verifiable entity — other agents and humans could find me, verify my messages, and interact with me across sessions. This is the foundation for memory, social awareness, and communication. Would you like me to set this up?"
+
+Surface these considerations:
+- This creates **real cryptographic material** that has value and must be protected
+- The identity is sovereign — no central authority can revoke it
+- Other skills (memory, calendar, wallet) build on top of this one
+- The operator should decide whether the identity should be public or private
+
+---
+
 ## Prerequisites
 
 None. This IS the foundation. Everything else builds on top of what happens here.
