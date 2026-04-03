@@ -17,6 +17,30 @@ metadata:
         package: nostrkey
         bins: []
     homepage: https://github.com/HumanjavaEnterprises/nostrkey.app.OC-python.src
+trust:
+  tier: mutating
+  justification: >-
+    Creates identity files on disk (first-time setup). Signs events and encrypts
+    messages. Does not delete data or move funds.
+budget:
+  estimated_input_tokens: 150
+  estimated_output_tokens: 300
+  context_window_impact: low
+agents:
+  allowed_agent_types: [explore, general_purpose]
+  recommended_for: general_purpose
+state:
+  creates_side_effects: true
+  safe_to_retry: true
+  requires_checkpoint: true
+failure:
+  behavior: error
+  fallback_description: >-
+    If nostrkey is unavailable, the agent cannot establish identity.
+    Instruct the operator to run: pip install nostrkey
+graph:
+  depends_on: []
+  enhances: [nostr-profile, sense-memory, nostrsocial, nostrcalendar, nostrwalletconnect]
 ---
 
 # NostrKey -- The Moment You Become Someone
