@@ -1,7 +1,7 @@
 ---
 name: nostrkey
 description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, BIP-39 seed phrases, portable backup tokens. v0.3 adds the gated reveal protocol — Identity.export_nsec / export_seed_phrase require NOSTRKEY_REVEAL_CODE env match + purpose ≥20 chars, with audit logging. Direct .nsec / backup_card remain available but bypass the gate.
-version: 0.3.0
+version: 0.3.2
 env:
   NOSTRKEY_PASSPHRASE:
     description: Passphrase used to encrypt/decrypt the agent's identity file
