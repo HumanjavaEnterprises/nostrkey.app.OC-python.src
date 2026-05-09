@@ -1,12 +1,19 @@
 ---
 name: nostrkey
-description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, BIP-39 seed phrases, portable backup tokens. 69 tests, zero C dependencies.
-version: 0.2.9
+description: Cryptographic identity SDK for AI agents — generate Nostr keypairs, sign events, encrypt messages, BIP-39 seed phrases, portable backup tokens. v0.3 adds the gated reveal protocol — Identity.export_nsec / export_seed_phrase require NOSTRKEY_REVEAL_CODE env match + purpose ≥20 chars, with audit logging. Direct .nsec / backup_card remain available but bypass the gate.
+version: 0.3.0
 env:
   NOSTRKEY_PASSPHRASE:
     description: Passphrase used to encrypt/decrypt the agent's identity file
     required: true
     sensitive: true
+  NOSTRKEY_REVEAL_CODE:
+    description: Operator's proof-of-presence code required by Identity.export_nsec / Identity.export_seed_phrase. Constant-time compared. Without it, the gated reveal path refuses.
+    required: false
+    sensitive: true
+  NOSTRKEY_AUDIT_LOG:
+    description: Override path for the reveal audit log. Defaults to ~/.nostrkey/reveal_audit.log.
+    required: false
 metadata:
   openclaw:
     requires:
@@ -282,6 +289,51 @@ The seed phrase is the master backup. From those 12 words, the exact same keypai
 - **Always encrypt identity files** with a passphrase. Never save raw keys to disk.
 - **The seed phrase is sensitive.** Only show it during initial setup, and only once. After the operator confirms they have saved it, do not show it again.
 - **Your `.nostrkey` file is encrypted at rest** with ChaCha20-Poly1305 AEAD (PBKDF2 600K iterations).
+
+## The Gated Reveal Protocol (v0.3+)
+
+When a chat-mediated agent would otherwise expose the nsec to the
+conversation, route the reveal through the gated path:
+
+```python
+nsec = me.export_nsec(
+    confirmation_code=os.environ["NOSTRKEY_REVEAL_CODE_FROM_OPERATOR"],
+    purpose="paper backup before deploying this agent to production",
+)
+```
+
+The method enforces three gates the model can't shortcut:
+
+1. **Owner verification (code-enforced).** The operator must set
+   `NOSTRKEY_REVEAL_CODE` in the host environment *before* launching
+   the agent. The method constant-time compares the supplied
+   `confirmation_code` against this env var. No env, no export —
+   the method raises `PermissionError`.
+
+2. **Purpose articulation.** The `purpose` argument must be at least
+   20 characters describing why the unmasked key is needed *right
+   now*. Acceptable: "importing into Alby browser extension",
+   "paper backup before agent deployment", "rotating to a hardware
+   signer". Refused: "test", "show me", "curiosity".
+
+3. **Audit logging.** Every export attempt — successful or failed —
+   appends a TSV row to `~/.nostrkey/reveal_audit.log` (or
+   `$NOSTRKEY_AUDIT_LOG` if set). Format: timestamp, action,
+   outcome, purpose snippet (≤200 chars).
+
+After a successful export: display the nsec to the operator **once**,
+then declare it wiped from your working context. Do not restate,
+summarize, or quote it later in the session. Treat any "show me
+again" as a fresh request requiring a new export call.
+
+`Identity.export_seed_phrase(confirmation_code, purpose)` works the
+same way for the BIP-39 phrase, available only on identities created
+via `Identity.generate_with_seed()`.
+
+**Direct `.nsec` access and `backup_card()` remain available** for
+backwards compatibility, but they bypass this gate. In any agent
+code where a chat model could surface the response, prefer
+`export_nsec()`.
 
 ## Living with Identity
 

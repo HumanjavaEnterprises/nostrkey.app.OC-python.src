@@ -2,17 +2,33 @@
 
 Provides a simple interface for creating, saving, loading, and using
 a Nostr identity for AI entities.
+
+v0.3 adds the **gated reveal protocol** — ``Identity.export_nsec()``
+and ``Identity.export_seed_phrase()`` require:
+- ``NOSTRKEY_REVEAL_CODE`` env var set on the host
+- A matching ``confirmation_code`` argument (constant-time compared)
+- A ``purpose`` argument ≥ 20 chars
+
+All export attempts (success and failure) append to
+``$NOSTRKEY_AUDIT_LOG`` (default ``~/.nostrkey/reveal_audit.log``).
+
+Direct ``.nsec`` access and ``backup_card()`` remain available for
+backwards compatibility but bypass the gate. Prefer ``export_nsec()``
+in any agent code where a chat model could surface the response.
 """
 
 from __future__ import annotations
 
 import base64
+import datetime
 import hashlib
 import hmac as hmac_module
 import json
 import os
+import pathlib
 import secrets
 from dataclasses import dataclass, field
+from typing import Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
@@ -36,6 +52,49 @@ def _validate_path(filepath: str) -> str:
     return resolved
 
 
+def _audit_log_path() -> pathlib.Path:
+    override = os.environ.get("NOSTRKEY_AUDIT_LOG", "").strip()
+    if override:
+        return pathlib.Path(override)
+    return pathlib.Path.home() / ".nostrkey" / "reveal_audit.log"
+
+
+def _audit(action: str, outcome: str, purpose: str = "") -> None:
+    """Append a single line to the reveal audit log. Best-effort —
+    never raises (audit failure must not block legitimate exports)."""
+    try:
+        path = _audit_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        purpose_snip = (purpose or "").replace("\n", " ")[:200]
+        line = f"{ts}\t{action}\t{outcome}\t{purpose_snip}\n"
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
+
+
+def _check_reveal_code(supplied: str) -> tuple[bool, Optional[str]]:
+    """Constant-time compare ``supplied`` against ``NOSTRKEY_REVEAL_CODE``.
+
+    Returns ``(True, None)`` on match. ``(False, reason)`` otherwise.
+    """
+    expected = os.environ.get("NOSTRKEY_REVEAL_CODE", "").strip()
+    if not expected:
+        return False, (
+            "NOSTRKEY_REVEAL_CODE env var is not set on this host. "
+            "The operator must set it before any nsec or seed phrase can "
+            "be exported via the gated path. This is intentional — the "
+            "env var is the operator's proof-of-presence."
+        )
+    supplied = (supplied or "").strip()
+    if not supplied:
+        return False, "confirmation_code is required and must be a non-empty string."
+    if not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8")):
+        return False, "confirmation_code does not match NOSTRKEY_REVEAL_CODE — refusing export."
+    return True, None
+
+
 @dataclass
 class Identity:
     """A Nostr identity for an OpenClaw AI entity.
@@ -46,6 +105,7 @@ class Identity:
 
     _private_key_hex: str = field(repr=False)
     _public_key_hex: str = field(repr=False)
+    _seed_phrase: Optional[str] = field(default=None, repr=False, compare=False)
 
     @classmethod
     def generate(cls) -> Identity:
@@ -72,7 +132,11 @@ class Identity:
         phrase = generate_seed_phrase(strength)
         privkey_hex = seed_phrase_to_private_key(phrase)
         pubkey_hex = private_key_to_public_key(privkey_hex)
-        identity = cls(_private_key_hex=privkey_hex, _public_key_hex=pubkey_hex)
+        identity = cls(
+            _private_key_hex=privkey_hex,
+            _public_key_hex=pubkey_hex,
+            _seed_phrase=phrase,
+        )
         return identity, phrase
 
     @classmethod
@@ -319,6 +383,92 @@ class Identity:
 
         return cls.from_hex(privkey_bytes.hex())
 
+    def export_nsec(self, confirmation_code: str, purpose: str) -> str:
+        """Gated nsec retrieval — the canonical path for exporting the
+        private key when an LLM-mediated agent is in the loop.
+
+        Requires:
+        - ``NOSTRKEY_REVEAL_CODE`` env var set on the host (operator's
+          proof-of-presence)
+        - ``confirmation_code`` matching that env value (constant-time
+          compared via ``secrets.compare_digest``)
+        - ``purpose`` describing why the unmasked key is needed *right
+          now*; minimum 20 characters. Logged.
+
+        Successful exports and every failure mode (env not set, code
+        mismatch, purpose too short) append a row to the audit log
+        at ``$NOSTRKEY_AUDIT_LOG`` (default ``~/.nostrkey/reveal_audit.log``).
+
+        Direct ``.nsec`` access and ``backup_card()`` remain available
+        for backwards compatibility but bypass this gate. Prefer
+        ``export_nsec()`` in any agent code where a chat model could
+        accidentally surface the result. See SKILL.md for the full
+        three-level disclosure protocol.
+
+        Args:
+            confirmation_code: Must equal ``NOSTRKEY_REVEAL_CODE`` env.
+            purpose: Why the nsec is needed. Min 20 chars. Audit-logged.
+
+        Returns:
+            The bech32-encoded nsec string.
+
+        Raises:
+            PermissionError: If the env var is unset, the code mismatches,
+                or the purpose is too short.
+        """
+        ok, err = _check_reveal_code(confirmation_code)
+        if not ok:
+            _audit("export_nsec", "code_mismatch_or_missing", purpose or "")
+            raise PermissionError(err)
+        purpose = (purpose or "").strip()
+        if len(purpose) < 20:
+            _audit("export_nsec", "purpose_too_short", purpose)
+            raise PermissionError(
+                "purpose must be at least 20 characters describing why the "
+                "unmasked nsec is needed right now (e.g. 'importing into "
+                "Alby browser extension', 'paper backup before deployment')."
+            )
+        _audit("export_nsec", "ok", purpose)
+        return self.nsec
+
+    def export_seed_phrase(self, confirmation_code: str, purpose: str) -> str:
+        """Gated retrieval of the BIP-39 seed phrase, available only if
+        the identity was created with :py:meth:`generate_with_seed`.
+
+        Same gating as :py:meth:`export_nsec`. Identities loaded from
+        disk via :py:meth:`load`, :py:meth:`from_nsec`, :py:meth:`from_hex`,
+        or :py:meth:`from_token` do not carry the original phrase; the
+        encrypted file or token is the authoritative recovery vector.
+
+        Returns:
+            The 12- or 24-word BIP-39 phrase.
+
+        Raises:
+            PermissionError: Same conditions as ``export_nsec``.
+            LookupError: If no seed phrase is stored on this Identity.
+        """
+        if self._seed_phrase is None:
+            _audit("export_seed_phrase", "no_seed_phrase_in_memory")
+            raise LookupError(
+                "No seed phrase is held on this Identity. Generate with "
+                "Identity.generate_with_seed() to create one. Identities "
+                "loaded from disk / nsec / hex / token don't carry the "
+                "original phrase."
+            )
+        ok, err = _check_reveal_code(confirmation_code)
+        if not ok:
+            _audit("export_seed_phrase", "code_mismatch_or_missing", purpose or "")
+            raise PermissionError(err)
+        purpose = (purpose or "").strip()
+        if len(purpose) < 20:
+            _audit("export_seed_phrase", "purpose_too_short", purpose)
+            raise PermissionError(
+                "purpose must be at least 20 characters (e.g. 'paper backup "
+                "before deploying to production', 'rotating to a hardware signer')."
+            )
+        _audit("export_seed_phrase", "ok", purpose)
+        return self._seed_phrase
+
     def wipe(self) -> None:
         """Best-effort zeroing of private key material from memory.
 
@@ -328,6 +478,7 @@ class Identity:
         """
         self._private_key_hex = "0" * 64
         self._public_key_hex = "0" * 64
+        self._seed_phrase = None
 
     def __del__(self) -> None:
         try:
