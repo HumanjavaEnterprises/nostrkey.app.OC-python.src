@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
+import socket
 import uuid
 from typing import AsyncIterator
 from urllib.parse import urlparse
@@ -14,17 +15,42 @@ import websockets
 from nostrkey.events import NostrEvent
 
 
+def _is_blocked_address(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Return True if an IP address must not be dialed (SSRF guard)."""
+    # Unwrap IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) so the IPv4 checks apply.
+    mapped = getattr(addr, "ipv4_mapped", None)
+    if mapped is not None:
+        addr = mapped
+    return (
+        addr.is_loopback
+        or addr.is_private
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_multicast
+        or addr.is_unspecified
+    )
+
+
 def validate_relay_url(url: str) -> None:
     """Validate a relay URL for scheme and SSRF safety.
 
-    Blocks localhost, private IPs, link-local, and reserved addresses
-    to prevent SSRF when relay URLs come from untrusted sources.
+    Blocks localhost, private IPs, link-local, multicast, unspecified, and
+    reserved addresses to prevent SSRF when relay URLs come from untrusted
+    sources (e.g. bunker:// URLs or event content). DNS hostnames are
+    resolved via getaddrinfo and EVERY resolved address is checked, so a
+    hostname pointing at 169.254.169.254 or 127.0.0.1 is rejected the same
+    as a literal IP. Unresolvable hostnames fail closed.
+
+    Note: this validates the addresses at validation time. A hostile DNS
+    server that re-resolves differently at connect time (DNS rebinding) is
+    only fully defeated by pinning the vetted IP for the actual dial.
 
     Args:
         url: The relay WebSocket URL to validate.
 
     Raises:
-        ValueError: If the URL is invalid or points to a private address.
+        ValueError: If the URL is invalid, unresolvable, or points (directly
+            or via DNS) to a private/reserved address.
     """
     parsed = urlparse(url)
     if parsed.scheme not in ("ws", "wss"):
@@ -40,17 +66,44 @@ def validate_relay_url(url: str) -> None:
     if hostname in ("localhost", "0.0.0.0"):
         raise ValueError(f"Relay URL must not point to localhost: {hostname}")
 
-    # Check for private/reserved IP addresses
+    # Literal IP hostname: check it directly.
     try:
         addr = ipaddress.ip_address(hostname)
-        if addr.is_loopback or addr.is_private or addr.is_link_local or addr.is_reserved:
+    except ValueError:
+        addr = None
+
+    if addr is not None:
+        if _is_blocked_address(addr):
             raise ValueError(
                 f"Relay URL must not point to a private or reserved address: {hostname}"
             )
-    except ValueError as exc:
-        # Re-raise our own ValueErrors, skip if it's just "not an IP" (i.e. a hostname)
-        if "Relay URL" in str(exc):
-            raise
+        return
+
+    # DNS hostname: resolve it and apply the same block to every resolved
+    # address. A name like metadata.attacker.example -> 169.254.169.254
+    # must not bypass the guard.
+    port = parsed.port or (443 if parsed.scheme == "wss" else 80)
+    try:
+        infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise ValueError(
+            f"Relay URL hostname could not be resolved: {hostname}"
+        ) from exc
+    if not infos:
+        raise ValueError(f"Relay URL hostname could not be resolved: {hostname}")
+
+    for _family, _type, _proto, _canonname, sockaddr in infos:
+        try:
+            resolved = ipaddress.ip_address(sockaddr[0])
+        except ValueError as exc:
+            raise ValueError(
+                f"Relay URL hostname resolved to an unparseable address: {hostname}"
+            ) from exc
+        if _is_blocked_address(resolved):
+            raise ValueError(
+                "Relay URL hostname resolves to a private or reserved address: "
+                f"{hostname} -> {resolved}"
+            )
 
 
 class RelayClient:

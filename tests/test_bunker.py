@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import socket
 
 import pytest
 
@@ -12,6 +13,22 @@ from nostrkey.events import UnsignedEvent, sign_event
 from nostrkey.keys import generate_keypair, hex_to_npub
 
 RELAY = "wss://relay.example.com"
+
+
+@pytest.fixture(autouse=True)
+def _public_dns(monkeypatch):
+    """Resolve the fake test relay hostname to a public IP (no real DNS).
+
+    validate_relay_url now resolves DNS hostnames and fails closed, so the
+    fake relay hostname must appear to resolve publicly for these tests.
+    """
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda host, port, *a, **k: [
+            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("8.8.8.8", port))
+        ],
+    )
 
 
 class FakeWebSocket:

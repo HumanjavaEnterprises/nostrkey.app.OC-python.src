@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.4 — 2026-07-17
+
+### Security
+- **Relay SSRF guard now checks resolved DNS addresses, not just IP
+  literals.** `validate_relay_url` previously only blocked hostnames that
+  literally parsed as private/loopback/link-local/reserved IPs, so a DNS
+  name resolving to an internal address (e.g. `169.254.169.254` cloud
+  metadata, `127.0.0.1`) bypassed the guard entirely. Hostnames are now
+  resolved via `getaddrinfo` and EVERY resolved address is checked against
+  the block list (loopback, private, link-local, reserved, multicast,
+  unspecified — with IPv4-mapped IPv6 unwrapped). Unresolvable hostnames
+  fail closed with `ValueError`. IPv6 unspecified (`[::]`) literals are now
+  also rejected. Note: validation resolves at check time; full DNS-rebinding
+  protection would additionally require pinning the vetted IP for the dial.
+
 ## 0.3.3 — 2026-07-17
 
 ### Fixed
