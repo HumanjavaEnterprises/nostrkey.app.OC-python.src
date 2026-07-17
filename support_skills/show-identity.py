@@ -4,7 +4,6 @@ Run this to see your current Nostr public identity. No passphrase needed.
 Usage: python3 show-identity.py
 """
 import json
-import sys
 
 PUBLIC_FILE = "/home/openclaw/.openclaw/workspace/nostr-identity.json"
 

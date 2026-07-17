@@ -5,8 +5,6 @@ Each test sets / unsets NOSTRKEY_REVEAL_CODE and points
 NOSTRKEY_AUDIT_LOG at a tmp file so tests don't pollute ~/.nostrkey/.
 """
 
-import os
-import tempfile
 from pathlib import Path
 
 import pytest

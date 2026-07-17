@@ -117,7 +117,6 @@ class TestIdentitySecurity:
 
     def test_wipe_clears_key(self):
         bot = Identity.generate()
-        original_npub = bot.npub
         bot.wipe()
         assert bot._private_key_hex == "0" * 64
         assert bot._public_key_hex == "0" * 64

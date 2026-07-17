@@ -36,6 +36,43 @@ class TestNIP44Padding:
             _pad_plaintext(b"x" * 65536)
 
 
+class TestNIP44UnpadValidation:
+    """Malformed padding must be rejected, not silently accepted (NIP-44 v2)."""
+
+    def test_declared_length_zero_raises(self):
+        # 2-byte prefix declaring length 0 followed by a valid 32-byte block
+        padded = b"\x00\x00" + b"\x00" * 32
+        with pytest.raises(ValueError):
+            _unpad_plaintext(padded)
+
+    def test_declared_length_exceeds_buffer_raises(self):
+        # Declares 100 bytes of plaintext but only 32 bytes follow
+        padded = b"\x00\x64" + b"a" * 32
+        with pytest.raises(ValueError):
+            _unpad_plaintext(padded)
+
+    def test_oversized_padding_raises(self):
+        # Declares 5 bytes (canonical padded length 32, total 34) but the
+        # buffer carries 64 bytes of padded content — inconsistent padding
+        padded = b"\x00\x05" + b"hello" + b"\x00" * 59
+        with pytest.raises(ValueError):
+            _unpad_plaintext(padded)
+
+    def test_undersized_padding_raises(self):
+        # Declares 33 bytes (canonical padded length 64, total 66) but the
+        # buffer only carries 40 bytes of padded content
+        padded = b"\x00\x21" + b"x" * 33 + b"\x00" * 5
+        with pytest.raises(ValueError):
+            _unpad_plaintext(padded)
+
+    def test_truncated_buffer_raises(self):
+        with pytest.raises(ValueError):
+            _unpad_plaintext(b"\x00")
+
+    def test_canonical_padding_accepted(self):
+        assert _unpad_plaintext(_pad_plaintext(b"hello")) == b"hello"
+
+
 class TestNIP44EncryptDecrypt:
     """Test encrypt/decrypt roundtrip."""
 

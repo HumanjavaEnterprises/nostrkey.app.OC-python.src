@@ -16,11 +16,15 @@ import websockets
 
 from nostrkey.crypto import decrypt, encrypt
 from nostrkey.events import NostrEvent, UnsignedEvent, sign_event
-from nostrkey.keys import private_key_to_public_key
+from nostrkey.keys import _validate_hex_key, npub_to_hex, private_key_to_public_key
 from nostrkey.relay import validate_relay_url
 
 
 logger = logging.getLogger(__name__)
+
+#: Default seconds to wait for a remote-signer response. Connect and sign
+#: requests await human approval on the other end, so this is generous.
+DEFAULT_RESPONSE_TIMEOUT = 60.0
 
 
 class BunkerClient:
@@ -44,23 +48,43 @@ class BunkerClient:
         self._ws = None
         self._sub_id: str = "bunker"
 
-    async def connect(self, bunker_url: str) -> None:
+    async def connect(
+        self, bunker_url: str, timeout: float = DEFAULT_RESPONSE_TIMEOUT
+    ) -> None:
         """Connect to a bunker via a bunker:// URL.
 
         Args:
-            bunker_url: NIP-46 bunker URL (bunker://npub...?relay=wss://...)
+            bunker_url: NIP-46 bunker URL (bunker://npub...?relay=wss://...).
+                The signer pubkey may be npub bech32 or 64-char hex; an
+                optional ``secret`` query parameter is forwarded per NIP-46.
+            timeout: Seconds to wait for the signer's connect response.
+
+        Raises:
+            ValueError: If the URL is malformed or the signer pubkey is invalid.
+            RuntimeError: If the remote signer rejects the connect request.
+            TimeoutError: If the signer does not respond within `timeout`.
         """
         parsed = urlparse(bunker_url)
         if parsed.scheme != "bunker":
             raise ValueError(f"Expected bunker:// URL, got {parsed.scheme}://")
 
-        self._remote_pubkey = parsed.netloc
+        # Normalize the remote signer pubkey to 64-char hex. Relay filters,
+        # p-tags, and response checks all require hex — an npub would match
+        # nothing and hang forever.
+        remote = parsed.netloc
+        if remote.startswith("npub"):
+            remote = npub_to_hex(remote)
+        _validate_hex_key(remote, "remote signer pubkey")
+        self._remote_pubkey = remote
+
         params = parse_qs(parsed.query)
         relays = params.get("relay", [])
         if not relays:
             raise ValueError("Bunker URL must include a relay parameter")
         self._relay_url = relays[0]
         validate_relay_url(self._relay_url)
+
+        secret = params.get("secret", [None])[0]
 
         self._ws = await websockets.connect(self._relay_url, open_timeout=30)
 
@@ -73,8 +97,23 @@ class BunkerClient:
         ])
         await self._ws.send(sub_msg)
 
-        # Send connect request
-        await self._send_request("connect", [self._pubkey])
+        # Send connect request: params are [remote-signer-pubkey, optional-secret]
+        # per NIP-46 (NOT the client's own pubkey).
+        response = await self._send_request(
+            "connect", [self._remote_pubkey, secret or ""], timeout=timeout
+        )
+        if response is None:
+            raise RuntimeError(
+                "Bunker connect failed: relay connection closed before the "
+                "remote signer responded"
+            )
+        if response.get("error"):
+            raise RuntimeError(f"Bunker connect rejected by remote signer: {response['error']}")
+        result = response.get("result")
+        if result not in ("ack", secret):
+            # Signers are expected to reply "ack" (or echo the secret); accept
+            # other non-error results but note them for debugging.
+            logger.debug("Unexpected bunker connect result: %r", result)
 
     async def sign_event(
         self, kind: int, content: str, tags: list[list[str]] | None = None
@@ -115,8 +154,14 @@ class BunkerClient:
             await self._ws.close()
             self._ws = None
 
-    async def _send_request(self, method: str, params: list) -> dict | None:
-        """Send an encrypted NIP-46 request and wait for response."""
+    async def _send_request(
+        self, method: str, params: list, timeout: float = DEFAULT_RESPONSE_TIMEOUT
+    ) -> dict | None:
+        """Send an encrypted NIP-46 request and wait for response.
+
+        Raises:
+            TimeoutError: If no response arrives within `timeout` seconds.
+        """
         if not self._ws or not self._remote_pubkey:
             raise RuntimeError("Not connected — call connect() first")
 
@@ -138,7 +183,15 @@ class BunkerClient:
 
         await self._ws.send(json.dumps(["EVENT", wrapper.to_dict()]))
 
-        # Wait for response
+        try:
+            return await asyncio.wait_for(self._wait_for_response(request_id), timeout)
+        except asyncio.TimeoutError:
+            raise TimeoutError(
+                f"No response from remote signer for '{method}' within {timeout}s"
+            ) from None
+
+    async def _wait_for_response(self, request_id: str) -> dict | None:
+        """Read relay messages until the response with `request_id` arrives."""
         async for raw in self._ws:
             data = json.loads(raw)
             if data[0] == "EVENT" and data[1] == self._sub_id:
