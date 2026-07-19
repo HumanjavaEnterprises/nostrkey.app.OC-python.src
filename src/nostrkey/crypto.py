@@ -54,13 +54,21 @@ def _pad_plaintext(plaintext: bytes) -> bytes:
 
 
 def _unpad_plaintext(padded: bytes) -> bytes:
-    """Remove padding from decrypted plaintext."""
+    """Remove padding from decrypted plaintext, validating per NIP-44 v2.
+
+    The declared length must be non-zero and the total buffer length must be
+    exactly 2 + calc_padded_len(declared_len) — inconsistent padding is
+    rejected rather than silently accepted.
+    """
     if len(padded) < 2:
         raise ValueError("Decryption failed")
-    actual_len = struct.unpack(">H", padded[:2])[0]
-    if actual_len > len(padded) - 2:
+    unpadded_len = struct.unpack(">H", padded[:2])[0]
+    if unpadded_len == 0:
         raise ValueError("Decryption failed")
-    return padded[2 : 2 + actual_len]
+    unpadded = padded[2 : 2 + unpadded_len]
+    if len(unpadded) != unpadded_len or len(padded) != 2 + _calc_padded_len(unpadded_len):
+        raise ValueError("Decryption failed")
+    return unpadded
 
 
 def encrypt(sender_nsec: str, recipient_npub: str, plaintext: str) -> str:

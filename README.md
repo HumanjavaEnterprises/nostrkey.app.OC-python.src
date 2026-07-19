@@ -4,7 +4,9 @@
 
 A Python SDK for OpenClaw AI entities to generate Nostr keypairs, sign events, encrypt data, and manage their own identity on the Nostr protocol.
 
-**v0.2.6** — OC-ready identity onboarding, support_skills for manual deployment, BIP-39 seed phrases, portable backup tokens, 69 tests. Zero C dependencies. `pip install nostrkey` just works.
+**v0.3.4** — the kernel of the coordinated 2026-07 correctness release (staged, pending PyPI publish). NIP-46 bunker `connect()` correctness, canonical NIP-44 v2 unpad, relay SSRF guard now checks resolved DNS addresses, and official NIP-06 known-answer test vectors. Zero C dependencies. `pip install nostrkey` just works.
+
+> **Coordinated 2026-07 correctness release.** The whole Nostr library family was audited together and is now verified against a shared spine of known-answer test vectors (NIP-44 v2, NIP-49, NIP-19 TLV, BIP-340) so encode/decode bugs can't hide inside self-round-trip tests. nostrkey carries that vector spine. These fixes are **staged on a branch and pending PyPI publish**. See [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## Why?
 

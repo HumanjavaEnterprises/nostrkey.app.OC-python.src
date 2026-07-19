@@ -34,7 +34,6 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from nostrkey.events import NostrEvent, UnsignedEvent, sign_event
 from nostrkey.keys import (
-    _validate_hex_key,
     _validate_private_key,
     generate_keypair,
     hex_to_npub,

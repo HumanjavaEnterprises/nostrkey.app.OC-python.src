@@ -26,13 +26,13 @@ def _derive_hardened(
 ) -> tuple[bytes, bytes]:
     """BIP-32 hardened child key derivation."""
     data = b"\x00" + parent_key + struct.pack(">I", 0x80000000 | index)
-    I = hmac_module.new(parent_chain, data, hashlib.sha512).digest()
+    digest = hmac_module.new(parent_chain, data, hashlib.sha512).digest()
     child_int = (
-        int.from_bytes(I[:32], "big") + int.from_bytes(parent_key, "big")
+        int.from_bytes(digest[:32], "big") + int.from_bytes(parent_key, "big")
     ) % _SECP256K1_ORDER
     if child_int == 0:
         raise ValueError("Derived key is zero — astronomically unlikely, retry with next index")
-    return child_int.to_bytes(32, "big"), I[32:]
+    return child_int.to_bytes(32, "big"), digest[32:]
 
 
 def _derive_normal(
@@ -47,13 +47,13 @@ def _derive_normal(
     prefix = b"\x02" if point[1] % 2 == 0 else b"\x03"
     pub_compressed = prefix + point[0].to_bytes(32, "big")
     data = pub_compressed + struct.pack(">I", index)
-    I = hmac_module.new(parent_chain, data, hashlib.sha512).digest()
+    digest = hmac_module.new(parent_chain, data, hashlib.sha512).digest()
     child_int = (
-        int.from_bytes(I[:32], "big") + int.from_bytes(parent_key, "big")
+        int.from_bytes(digest[:32], "big") + int.from_bytes(parent_key, "big")
     ) % _SECP256K1_ORDER
     if child_int == 0:
         raise ValueError("Derived key is zero — astronomically unlikely, retry with next index")
-    return child_int.to_bytes(32, "big"), I[32:]
+    return child_int.to_bytes(32, "big"), digest[32:]
 
 
 def _derive_nip06(seed_bytes: bytes) -> bytes:
@@ -68,8 +68,8 @@ def _derive_nip06(seed_bytes: bytes) -> bytes:
         32-byte private key.
     """
     # BIP-32 master key from seed
-    I = hmac_module.new(b"Bitcoin seed", seed_bytes, hashlib.sha512).digest()
-    key, chain = I[:32], I[32:]
+    digest = hmac_module.new(b"Bitcoin seed", seed_bytes, hashlib.sha512).digest()
+    key, chain = digest[:32], digest[32:]
 
     # Walk the derivation path
     for index, hardened in _NIP06_PATH:
