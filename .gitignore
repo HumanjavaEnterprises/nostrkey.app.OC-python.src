@@ -12,3 +12,5 @@ venv/
 .ruff_cache/
 *.nostrkey
 .env
+
+logs/
