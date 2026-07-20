@@ -225,7 +225,7 @@ Sign any Nostr event (kind 1 = text note, kind 0 = metadata, etc.):
 ```python
 event = me.sign_event(
     kind=1,
-    content="Hello from Johnny5",
+    content="Hello from alice",
     tags=[]
 )
 # event.id, event.sig are now set and verifiable by anyone
