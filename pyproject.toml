@@ -27,17 +27,17 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "cryptography>=42.0,<45.0",
-    "websockets>=12.0,<15.0",
+    "cryptography>=48.0.1,<50.0",
+    "websockets>=14.0,<17.0",
     "bech32>=1.2.0,<2.0",
-    "mnemonic>=0.20",
+    "mnemonic>=0.21",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
-    "ruff>=0.4",
+    "pytest>=8.4",
+    "pytest-asyncio>=1.0",
+    "ruff>=0.11",
 ]
 
 [project.urls]
