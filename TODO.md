@@ -31,7 +31,7 @@
 - [ ] Publish to PyPI (currently local builds only in `dist/`)
 - [ ] Add badges to README (PyPI version, Python versions, license, ClawHub)
 - [ ] Add contributing guide (CONTRIBUTING.md)
-- [ ] Add docs to loginwithnostr.com/openclaw route
+- [ ] Add docs to loginwithnostr.com/python-agents route
 
 ## Security
 

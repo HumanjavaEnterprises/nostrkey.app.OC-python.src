@@ -268,7 +268,7 @@ Don't paste raw nsec keys into the OC chat UI. Instead:
 - **PyPI:** https://pypi.org/project/nostrkey/
 - **ClawHub:** https://clawhub.ai/skills/nostrkey
 - **Docs:** https://nostrkey.com/python
-- **OpenClaw:** https://loginwithnostr.com/openclaw
+- **OpenClaw:** https://loginwithnostr.com/python-agents
 
 ## License
 
